@@ -31,11 +31,14 @@ struct dlm_mem_operations {
 
 struct dlm_mem {
 	size_t size;
-//	u32 flags;
 	u32 magic;
+	int nref;
 
 	const struct dlm_mem_operations *ops;
 };
+
+int dlm_mem_retain(struct dlm_mem *mem);
+int dlm_mem_release(struct dlm_mem *mem);
 
 static inline void* dlm_mem_map(struct dlm_mem *mem, enum DLM_MEM_MAP_FLAGS flags)
 {
@@ -45,11 +48,6 @@ static inline void* dlm_mem_map(struct dlm_mem *mem, enum DLM_MEM_MAP_FLAGS flag
 static inline void dlm_mem_unmap(struct dlm_mem *mem, void *va)
 {
 	mem->ops->unmap(mem, va);
-}
-
-static inline int dlm_mem_release(struct dlm_mem *mem)
-{
-	return mem->ops->release(mem);
 }
 
 #endif /* DLM_MEMORY_H__ */

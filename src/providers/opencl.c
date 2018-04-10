@@ -88,8 +88,7 @@ static const struct dlm_mem_operations opencl_memory_ops = {
 
 static void init_mem_base(struct dlm_cl_memory *mem, size_t size)
 {
-	mem->mem.size = size;
-	mem->mem.magic = DLM_MEM_OPENCL_MAGIC;
+	dlm_init_mem(&mem->mem, size, DLM_MEM_OPENCL_MAGIC);
 	mem->mem.ops = &opencl_memory_ops;
 }
 
@@ -120,9 +119,10 @@ dlm_cl_allocate_memory_ex(size_t size,
 	if (ret != CL_SUCCESS)
 		goto error;
 
+	mem->clmem = clmem;
 	init_mem_base(mem, size);
 	init_mem_ctx(mem, ctx);
-	mem->clmem = clmem;
+	dlm_mem_retain(&mem->mem);
 
 	return dlm_cl_to_mem(mem);
 error:
@@ -159,9 +159,10 @@ dlm_cl_create_from_clmem(cl_mem clmem,
 	if (ret != CL_SUCCESS)
 		goto error;
 
+	mem->clmem = clmem;
 	init_mem_base(mem, size);
 	init_mem_ctx(mem, ctx);
-	mem->clmem = clmem;
+	dlm_mem_retain(&mem->mem);
 
 	return dlm_cl_to_mem(mem);
 error:
@@ -175,8 +176,15 @@ create_from_vms(struct dlm_vms_memory *vms,
 		struct dlm_mem_cl_context *ctx,
 		cl_mem_flags flags)
 {
+	struct dlm_mem *mem;
+
 	flags |= CL_MEM_USE_HOST_PTR;
-	return dlm_cl_allocate_memory_ex(vms->mem.size, ctx, vms->va, flags);
+	dlm_mem_retain(&vms->mem);
+	mem = dlm_cl_allocate_memory_ex(vms->mem.size, ctx, vms->va, flags);
+
+	if (!mem)
+		dlm_mem_release(&vms->mem);
+	return mem;
 }
 
 struct dlm_mem *
@@ -184,8 +192,16 @@ dlm_cl_create_from(struct dlm_mem *master,
 		   struct dlm_mem_cl_context *ctx,
 		   cl_mem_flags flags)
 {
-	if (master->magic == DLM_MEM_VMS_MAGIC)
-		return create_from_vms(dlm_mem_to_vms(master), ctx, flags);
+	struct dlm_mem *mem;
 
-	return dlm_cl_allocate_memory(master->size, ctx, flags);
+	if (!dlm_mem_retain(master))
+		return NULL;
+
+	if (master->magic == DLM_MEM_VMS_MAGIC)
+		mem = create_from_vms(dlm_mem_to_vms(master), ctx, flags);
+	else
+		mem = dlm_cl_allocate_memory(master->size, ctx, flags);
+
+	dlm_mem_release(master);
+	return mem;
 }

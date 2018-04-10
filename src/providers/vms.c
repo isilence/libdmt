@@ -45,10 +45,9 @@ dlm_vms_allocate_memory(size_t size)
 	if (!mem)
 		return NULL;
 
-	mem->mem.size = size;
-	mem->mem.magic = DLM_MEM_VMS_MAGIC;
-	mem->mem.ops = &vms_memory_ops;
+	dlm_init_mem(&mem->mem, size, DLM_MEM_VMS_MAGIC);
 	mem->va = valloc(size);
+	dlm_mem_retain(&mem->mem);
 
 	return dlm_vms_to_mem(mem);
 }

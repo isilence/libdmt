@@ -31,3 +31,28 @@ unmap_src:
 exit_foo:
 	return ret;
 }
+
+void dlm_init_mem(struct dlm_mem *mem,
+		  size_t size,
+		  u32 magic)
+{
+	mem->magic = magic;
+	mem->size = size;
+	mem->ops = NULL;
+	mem->nref = 0;
+}
+
+int dlm_mem_retain(struct dlm_mem *mem)
+{
+	mem->nref += 1;
+	return 0;
+}
+
+int dlm_mem_release(struct dlm_mem *mem)
+{
+	mem->nref -= 1;
+	if (mem->nref == 0)
+		return mem->ops->release(mem);
+
+	return 0;
+}
