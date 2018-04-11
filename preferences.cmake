@@ -9,8 +9,18 @@ if(MSVC)
     endif()
 
 elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
-    set(CMAKE_C_FLAGS "-Wall -Werror -std=gnu99")
-    set(CMAKE_CXX_FLAGS "-Wall -Werror")
+    set(CMAKE_C_FLAGS "-std=gnu99")
+
+    add_definitions(
+            -Wall
+            -Werror
+
+            -Wno-gnu
+            -Wno-unused-value
+            -Wno-pointer-arith
+            -Wno-error=unused-but-set-variable
+            -Wno-error=unused-const-variable
+    )
 endif()
 
 if (CMAKE_VERSION VERSION_LESS "3.1")
@@ -20,15 +30,3 @@ if (CMAKE_VERSION VERSION_LESS "3.1")
 else ()
     set(CMAKE_CXX_STANDARD 11)
 endif ()
-
-
-add_definitions(
-    -Wall
-    -Wpedantic
-    -Werror
-
-    -Wno-unused-value
-    -Wno-pointer-arith
-    -Wno-error=unused-but-set-variable
-    -Wno-error=unused-const-variable
-)

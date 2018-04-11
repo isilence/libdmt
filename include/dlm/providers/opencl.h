@@ -23,8 +23,9 @@ struct dlm_cl_mem {
 	cl_int			err;
 };
 
-#define dlm_mem_to_cl(mem) ((struct dlm_cl_mem *)(mem))
-#define dlm_cl_to_mem(mem) ((struct dlm_mem *)(mem))
+#define dlm_mem_to_cl(memobj) \
+	dlm_mem_to_dlm((memobj), struct dlm_cl_mem, DLM_MEM_OPENCL_MAGIC)
+#define dlm_cl_to_mem(memobj) (&(memobj)->mem)
 
 struct dlm_mem_cl_context {
 	cl_device_id		device;

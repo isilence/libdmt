@@ -10,8 +10,9 @@ struct dlm_vms_mem {
 	void *va;
 };
 
-#define dlm_mem_to_vms(mem) ((struct dlm_vms_mem *)(mem))
-#define dlm_vms_to_mem(mem) ((struct dlm_mem *)(mem))
+#define dlm_mem_to_vms(memobj) \
+	dlm_mem_to_dlm((memobj), struct dlm_vms_mem, DLM_MEM_VMS_MAGIC)
+#define dlm_vms_to_mem(memobj) (&(memobj)->mem)
 
 struct dlm_mem * dlm_vms_allocate_memory(size_t size);
 struct dlm_mem * dlm_vms_create_from(struct dlm_mem *master);

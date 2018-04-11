@@ -50,4 +50,6 @@ static inline void dlm_mem_unmap(struct dlm_mem *mem, void *va)
 	mem->ops->unmap(mem, va);
 }
 
+#define dlm_mem_to_dlm(memobj, type, magic) container_of((memobj), type, mem)
+
 #endif /* DLM_MEMORY_H__ */
