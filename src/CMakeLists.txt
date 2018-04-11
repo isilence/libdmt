@@ -30,6 +30,10 @@ set(SOURCE_FILES
         # opencl devices
         ${DIR_INC}/dlm/providers/opencl.h
         providers/opencl.c
+
+        # infiniband verbs devices
+        ${DIR_INC}/dlm/providers/ib.h
+        providers/ib.c
 )
 
 add_library(dlm ${SOURCE_FILES})

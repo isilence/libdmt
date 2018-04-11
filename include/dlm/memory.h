@@ -45,9 +45,14 @@ static inline void* dlm_mem_map(struct dlm_mem *mem, enum DLM_MEM_MAP_FLAGS flag
 	return mem->ops->map(mem, flags);
 }
 
-static inline void dlm_mem_unmap(struct dlm_mem *mem, void *va)
+static inline int dlm_mem_unmap(struct dlm_mem *mem, void *va)
 {
-	mem->ops->unmap(mem, va);
+	return mem->ops->unmap(mem, va);
+}
+
+static inline int dlm_mem_copy(struct dlm_mem *src, struct dlm_mem *dst)
+{
+	return src->ops->copy(src, dst);
 }
 
 #define dlm_mem_to_dlm(memobj, type, magic) container_of((memobj), type, mem)
