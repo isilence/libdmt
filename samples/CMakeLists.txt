@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 2.6)
-project(test)
+project(test C)
 
 include_directories(${DIR_INC})
 
 set(SOURCE_FILES
-    main.cpp
+        main.c
 )
 
 add_executable(sample ${SOURCE_FILES})
