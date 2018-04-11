@@ -7,7 +7,7 @@
 static void *
 vms_map(struct dlm_mem *dlm_mem, enum DLM_MEM_MAP_FLAGS flags)
 {
-	struct dlm_vms_memory *mem = dlm_mem_to_vms(dlm_mem);
+	struct dlm_vms_mem *mem = dlm_mem_to_vms(dlm_mem);
 
 	return mem->va;
 }
@@ -22,7 +22,7 @@ vms_unmap(struct dlm_mem *dlm_mem DLM_PARAM_UNUSED, void *va DLM_PARAM_UNUSED)
 static int
 vms_release(struct dlm_mem *dlm_mem)
 {
-	struct dlm_vms_memory *mem = dlm_mem_to_vms(dlm_mem);
+	struct dlm_vms_mem *mem = dlm_mem_to_vms(dlm_mem);
 
 	free(mem->va);
 	free(dlm_mem);
@@ -39,13 +39,14 @@ static const struct dlm_mem_operations vms_memory_ops = {
 struct dlm_mem *
 dlm_vms_allocate_memory(size_t size)
 {
-	struct dlm_vms_memory *mem;
+	struct dlm_vms_mem *mem;
 
-	mem = (struct dlm_vms_memory *)malloc(sizeof(*mem));
+	mem = (struct dlm_vms_mem *)malloc(sizeof(*mem));
 	if (!mem)
 		return NULL;
 
 	dlm_init_mem(&mem->mem, size, DLM_MEM_VMS_MAGIC);
+	mem->mem.ops = &vms_memory_ops;
 	mem->va = valloc(size);
 	dlm_mem_retain(&mem->mem);
 

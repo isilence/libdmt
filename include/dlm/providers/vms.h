@@ -5,12 +5,12 @@
 
 #define DLM_MEM_VMS_MAGIC 0x1251
 
-struct dlm_vms_memory {
+struct dlm_vms_mem {
 	struct dlm_mem mem;
 	void *va;
 };
 
-#define dlm_mem_to_vms(mem) ((struct dlm_vms_memory *)(mem))
+#define dlm_mem_to_vms(mem) ((struct dlm_vms_mem *)(mem))
 #define dlm_vms_to_mem(mem) ((struct dlm_mem *)(mem))
 
 struct dlm_mem * dlm_vms_allocate_memory(size_t size);
