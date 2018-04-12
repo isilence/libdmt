@@ -17,6 +17,7 @@ set(SOURCE_FILES
         ${DIR_INC}/dlm/list.h
         ${DIR_INC}/dlm/poison.h
         ${DIR_INC}/dlm/stddef.h
+        ${DIR_INC}/dlm/object.h
 
         # memory
         ${DIR_INC}/dlm/memory.h

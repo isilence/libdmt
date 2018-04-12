@@ -4,6 +4,8 @@
 
 #include "generic_operations.h"
 
+#define dlm_obj_to_cl(dlm_obj) dlm_mem_to_cl(dlm_obj_to_mem((dlm_obj)))
+
 static int error_cl2unix(cl_int err)
 {
 	int ret;
@@ -69,26 +71,30 @@ cl_unmap(struct dlm_mem *dlm_mem, void *va)
 }
 
 static int
-cl_release(struct dlm_mem *dlm_mem)
+cl_release(struct dlm_obj *dlm_obj)
 {
-	struct dlm_cl_mem *mem = dlm_mem_to_cl(dlm_mem);
+	struct dlm_cl_mem *mem = dlm_obj_to_cl(dlm_obj);
 
 	mem->err = clReleaseMemObject(mem->clmem);
-	free(dlm_mem);
+	free(mem);
 
 	return error_cl2unix(mem->err);
 }
 
-static const struct dlm_mem_operations opencl_memory_ops = {
+static const struct dlm_obj_ops cl_obj_ops = {
+	.release = cl_release,
+};
+
+static const struct dlm_mem_ops opencl_memory_ops = {
 	.map = cl_map,
 	.unmap = cl_unmap,
-	.release = cl_release,
 	.copy = dlm_mem_generic_copy,
 };
 
 static void init_mem_base(struct dlm_cl_mem *mem, size_t size)
 {
-	dlm_init_mem(&mem->mem, size, DLM_MEM_OPENCL_MAGIC);
+	dlm_mem_init(&mem->mem, size, DLM_MEM_OPENCL_MAGIC);
+	dlm_obj_set_ops(&mem->mem.obj, &cl_obj_ops);
 	mem->mem.ops = &opencl_memory_ops;
 }
 

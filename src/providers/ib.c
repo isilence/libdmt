@@ -4,6 +4,9 @@
 
 #include "generic_operations.h"
 
+#define dlm_obj_to_ib(dlm_obj) dlm_mem_to_ib(dlm_obj_to_mem((dlm_obj)))
+
+
 static void *
 ib_map(struct dlm_mem *dlm_mem, enum DLM_MEM_MAP_FLAGS flags)
 {
@@ -19,22 +22,25 @@ ib_unmap(struct dlm_mem *dlm_mem DLM_PARAM_UNUSED, void *va DLM_PARAM_UNUSED)
 }
 
 static int
-ib_release(struct dlm_mem *dlm_mem)
+ib_release(struct dlm_obj *dlm_obj)
 {
 	int err_mr, err_dlm;
-	struct dlm_ib_mem *mem = dlm_mem_to_ib(dlm_mem);
+	struct dlm_ib_mem *mem = dlm_obj_to_ib(dlm_obj);
 
 	err_mr = ibv_dereg_mr(mem->mr);
 	err_dlm = dlm_mem_release(mem->vms);
-	free(dlm_mem);
+	free(mem);
 
 	return err_mr ? err_mr : err_dlm;
 }
 
-static const struct dlm_mem_operations ib_memory_ops = {
+static const struct dlm_obj_ops ib_obj_ops = {
+	.release = ib_release,
+};
+
+static const struct dlm_mem_ops ib_memory_ops = {
 	.map = ib_map,
 	.unmap = ib_unmap,
-	.release = ib_release,
 	.copy = dlm_mem_generic_copy,
 };
 
@@ -59,12 +65,14 @@ dlm_ib_allocate_memory(struct ibv_pd *pd, size_t size, int mr_reg_flags)
 	if (!mr)
 		goto err_vms;
 
-	dlm_init_mem(&mem->mem, vms->mem.size, DLM_MEM_IB_MAGIC);
+	dlm_mem_init(&mem->mem, vms->mem.size, DLM_MEM_IB_MAGIC);
+	dlm_obj_set_ops(&mem->mem.obj, &ib_obj_ops);
 	mem->mem.ops = &ib_memory_ops;
 	mem->pd = pd;
 	mem->mr = mr;
 	mem->vms = vms_mem;
 	dlm_mem_retain(&mem->mem);
+
 	return dlm_ib_to_mem(mem);
 
 err_vms:

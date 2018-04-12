@@ -6,7 +6,7 @@
 int dlm_mem_generic_copy(struct dlm_mem * restrict src,
 			 struct dlm_mem * restrict dst);
 
-void dlm_init_mem(struct dlm_mem *mem,
+void dlm_mem_init(struct dlm_mem *mem,
 		  size_t size,
 		  u32 magic);
 
