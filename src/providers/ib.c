@@ -2,7 +2,7 @@
 #include <dlm/providers/ib.h>
 #include <dlm/providers/vms.h>
 
-#include "generic_operations.h"
+#include "generic.h"
 
 #define dlm_obj_to_ib(dlm_obj) dlm_mem_to_ib(dlm_obj_to_mem((dlm_obj)))
 

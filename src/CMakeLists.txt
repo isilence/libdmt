@@ -6,6 +6,7 @@ find_package(OpenCL REQUIRED)
 if (${OpenCL_VERSION_STRING} VERSION_LESS "1.2")
     message(FATAL_ERROR "OpenCl v1.2 or greater required, current is v${OpenCL_VERSION_STRING}")
 endif()
+find_package(Threads REQUIRED)
 
 include_directories(.)
 include_directories(${DIR_INC})
@@ -21,8 +22,9 @@ set(SOURCE_FILES
 
         # memory
         ${DIR_INC}/dlm/memory.h
-        generic_operations.h
-        generic_operations.c
+        generic.h
+        generic.c
+        event_pthread_mtx.c
 
         # virtual memory storage
         ${DIR_INC}/dlm/providers/vms.h
@@ -38,4 +40,6 @@ set(SOURCE_FILES
 )
 
 add_library(dlm ${SOURCE_FILES})
-target_link_libraries(dlm OpenCL::OpenCL)
+target_link_libraries(dlm
+    OpenCL::OpenCL
+    ${CMAKE_THREAD_LIBS_INIT})
