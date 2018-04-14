@@ -13,12 +13,6 @@ void dlm_mem_init(struct dlm_mem *mem,
 		  size_t size,
 		  magic_t magic);
 
-static inline bool dlm_mem_copy_size_valid(struct dlm_mem *restrict src,
-					   struct dlm_mem *restrict dst)
-{
-	return (dst->size >= src->size);
-}
-
 static inline void dlm_event_init(struct dlm_event *event)
 {
 	dlm_obj_init(&event->obj);

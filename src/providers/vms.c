@@ -8,13 +8,7 @@
 
 static bool is_vms_mem(struct dlm_mem *mem)
 {
-	magic_t magic;
-
-	if (!mem)
-		return false;
-
-	magic = dlm_mem_get_magic(mem);
-	return magic == DLM_MAGIC_MEM_VMS;
+	return dlm_mem_get_magic(mem) == DLM_MAGIC_MEM_VMS;
 }
 
 static void *
@@ -44,7 +38,7 @@ vms_release(struct dlm_obj *dlm_obj)
 {
 	struct dlm_vms_mem *mem;
 
-	if (!dlm_obj || dlm_obj->magic != DLM_MAGIC_MEM_VMS)
+	if (dlm_obj->magic != DLM_MAGIC_MEM_VMS)
 		return -EFAULT;
 	mem = dlm_obj_to_vms(dlm_obj);
 

@@ -40,22 +40,28 @@ struct dlm_mem {
 
 static inline magic_t dlm_mem_get_magic(struct dlm_mem *mem)
 {
-	magic_t magic = mem->obj.magic;
-
-	return magic;
+	return mem->obj.magic;
 }
 
 static inline bool dlm_obj_is_mem(struct dlm_obj *obj)
 {
-	magic_t magic = obj->magic;
-	bool res = DLM_MAGIC_IS_MEM(magic);
+	return DLM_MAGIC_IS_MEM(obj->magic);
+}
 
-	return res;
-};
+static inline bool dlm_mem_copy_size_valid(struct dlm_mem *restrict src,
+					   struct dlm_mem *restrict dst)
+{
+	return (dst->size >= src->size);
+}
+
+static inline bool dlm_mem_valid(struct dlm_mem *mem)
+{
+	return (mem != NULL) && dlm_obj_is_mem(&mem->obj);
+}
 
 static inline int dlm_mem_retain(struct dlm_mem *mem)
 {
-	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(mem)))
+	if (!dlm_mem_valid(mem))
 		return -EINVAL;
 
 	return dlm_obj_retain(&mem->obj);
@@ -63,7 +69,7 @@ static inline int dlm_mem_retain(struct dlm_mem *mem)
 
 static inline int dlm_mem_release(struct dlm_mem *mem)
 {
-	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(mem)))
+	if (!dlm_mem_valid(mem))
 		return -EINVAL;
 
 	return dlm_obj_release(&mem->obj);
@@ -71,7 +77,7 @@ static inline int dlm_mem_release(struct dlm_mem *mem)
 
 static inline void *dlm_mem_map(struct dlm_mem *mem, enum DLM_MEM_MAP_FLAGS flags)
 {
-	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(mem)))
+	if (!dlm_mem_valid(mem))
 		return NULL;
 
 	return mem->ops->map(mem, flags);
@@ -79,7 +85,7 @@ static inline void *dlm_mem_map(struct dlm_mem *mem, enum DLM_MEM_MAP_FLAGS flag
 
 static inline int dlm_mem_unmap(struct dlm_mem *mem, void *va)
 {
-	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(mem)))
+	if (!dlm_mem_valid(mem))
 		return -EINVAL;
 
 	return mem->ops->unmap(mem, va);
@@ -87,15 +93,18 @@ static inline int dlm_mem_unmap(struct dlm_mem *mem, void *va)
 
 static inline int dlm_mem_copy(struct dlm_mem *src, struct dlm_mem *dst)
 {
-	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(src))
-		|| !DLM_MAGIC_IS_MEM(dlm_mem_get_magic(dst)))
+	if (!dlm_mem_valid(src) || !dlm_mem_valid(dst))
 		return -EINVAL;
+	if (!dlm_mem_copy_size_valid(src, dst))
+		return -ENOSPC;
 
 	return src->ops->copy(src, dst);
 }
 
 #define dlm_mem_to_dlm(memobj, type, magic) container_of((memobj), type, mem)
 #define dlm_obj_to_mem(dlm_obj) container_of((dlm_obj), struct dlm_mem, obj)
+
+
 
 /*
  * Events

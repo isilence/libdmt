@@ -8,13 +8,7 @@
 
 static bool is_ib_mem(struct dlm_mem *mem)
 {
-	magic_t magic;
-
-	if (!mem)
-		return false;
-
-	magic = dlm_mem_get_magic(mem);
-	return magic == DLM_MAGIC_MEM_IB;
+	return dlm_mem_get_magic(mem) == DLM_MAGIC_MEM_IB;
 }
 
 static void *
@@ -44,7 +38,7 @@ ib_release(struct dlm_obj *dlm_obj)
 	int err_mr, err_dlm;
 	struct dlm_ib_mem *mem;
 
-	if (!dlm_obj || dlm_obj->magic != DLM_MAGIC_MEM_IB)
+	if (dlm_obj->magic != DLM_MAGIC_MEM_IB)
 		return -EFAULT;
 	mem = dlm_obj_to_ib(dlm_obj);
 

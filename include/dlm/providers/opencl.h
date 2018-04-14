@@ -12,6 +12,7 @@
 
 struct dlm_cl_mem {
 	struct dlm_mem mem;
+	struct dlm_mem *master;
 
 	cl_device_id		dev;
 	cl_context		context;
