@@ -19,6 +19,7 @@ set(SOURCE_FILES
         ${DIR_INC}/dlm/poison.h
         ${DIR_INC}/dlm/stddef.h
         ${DIR_INC}/dlm/object.h
+        ${DIR_INC}/dlm/providers/magic.h
 
         # memory
         ${DIR_INC}/dlm/memory.h

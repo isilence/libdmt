@@ -6,25 +6,47 @@
 
 #define dlm_obj_to_vms(dlm_obj) dlm_mem_to_vms(dlm_obj_to_mem((dlm_obj)))
 
+static bool is_vms_mem(struct dlm_mem *mem)
+{
+	magic_t magic;
+
+	if (!mem)
+		return false;
+
+	magic = dlm_mem_get_magic(mem);
+	return magic == DLM_MAGIC_MEM_VMS;
+}
+
 static void *
 vms_map(struct dlm_mem *dlm_mem, enum DLM_MEM_MAP_FLAGS flags)
 {
-	struct dlm_vms_mem *mem = dlm_mem_to_vms(dlm_mem);
+	struct dlm_vms_mem *mem;
 
+	if (!is_vms_mem(dlm_mem))
+		return NULL;
+
+	mem = dlm_mem_to_vms(dlm_mem);
 	return mem->va;
 }
 
 
 static int
-vms_unmap(struct dlm_mem *dlm_mem DLM_PARAM_UNUSED, void *va DLM_PARAM_UNUSED)
+vms_unmap(struct dlm_mem *dlm_mem, void *va)
 {
+	if (!is_vms_mem(dlm_mem))
+		return -EFAULT;
+
 	return 0;
 }
 
 static int
 vms_release(struct dlm_obj *dlm_obj)
 {
-	struct dlm_vms_mem *mem = dlm_obj_to_vms(dlm_obj);
+	struct dlm_vms_mem *mem;
+
+	if (!dlm_obj || dlm_obj->magic != DLM_MAGIC_MEM_VMS)
+		return -EFAULT;
+	mem = dlm_obj_to_vms(dlm_obj);
 
 	free(mem->va);
 	free(mem);
@@ -51,7 +73,7 @@ dlm_vms_allocate_memory(size_t size)
 	if (!mem)
 		return NULL;
 
-	dlm_mem_init(&mem->mem, size, DLM_MEM_VMS_MAGIC);
+	dlm_mem_init(&mem->mem, size, DLM_MAGIC_MEM_VMS);
 	dlm_obj_set_ops(&mem->mem.obj, &vms_obj_ops);
 	mem->mem.ops = &vms_memory_ops;
 	mem->va = valloc(size);

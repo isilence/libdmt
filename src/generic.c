@@ -34,11 +34,11 @@ exit_foo:
 
 void dlm_mem_init(struct dlm_mem *mem,
 		  size_t size,
-		  u32 magic)
+		  magic_t magic)
 {
-	mem->magic = magic;
+	dlm_obj_init(&mem->obj);
+
+	mem->obj.magic = magic;
 	mem->size = size;
 	mem->ops = NULL;
-
-	dlm_obj_init(&mem->obj);
 }

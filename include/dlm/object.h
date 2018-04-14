@@ -1,5 +1,6 @@
 #ifndef DLM_OBJECT_H__
 #define DLM_OBJECT_H__
+#include <dlm/providers/magic.h>
 
 typedef unsigned int u32;
 
@@ -12,12 +13,14 @@ struct dlm_obj_ops {
 
 struct dlm_obj {
 	int nref;
+	magic_t magic;
 
 	int (*release)(struct dlm_obj *);
 };
 
 static inline void dlm_obj_init(struct dlm_obj *obj)
 {
+	obj->magic = DLM_MAGIC_UNDEFINED;
 	obj->nref = 0;
 	obj->release = NULL;
 }
@@ -36,6 +39,9 @@ static inline int dlm_obj_retain(struct dlm_obj *obj)
 
 static inline int dlm_obj_release(struct dlm_obj *obj)
 {
+	if (obj->nref <= 0)
+		return -EFAULT;
+
 	obj->nref -= 1;
 	if (obj->nref == 0)
 		return obj->release(obj);

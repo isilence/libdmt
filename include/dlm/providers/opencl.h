@@ -10,8 +10,6 @@
 	#include <CL/cl_ext.h>
 #endif
 
-#define DLM_MEM_OPENCL_MAGIC 0x1252
-
 struct dlm_cl_mem {
 	struct dlm_mem mem;
 
@@ -24,7 +22,7 @@ struct dlm_cl_mem {
 };
 
 #define dlm_mem_to_cl(memobj) \
-	dlm_mem_to_dlm((memobj), struct dlm_cl_mem, DLM_MEM_OPENCL_MAGIC)
+	dlm_mem_to_dlm((memobj), struct dlm_cl_mem, DLM_MAGIC_MEM_OPENCL)
 #define dlm_cl_to_mem(memobj) (&(memobj)->mem)
 
 struct dlm_mem_cl_context {

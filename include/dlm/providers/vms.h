@@ -3,15 +3,13 @@
 
 #include <dlm/memory.h>
 
-#define DLM_MEM_VMS_MAGIC 0x1251
-
 struct dlm_vms_mem {
 	struct dlm_mem mem;
 	void *va;
 };
 
 #define dlm_mem_to_vms(memobj) \
-	dlm_mem_to_dlm((memobj), struct dlm_vms_mem, DLM_MEM_VMS_MAGIC)
+	dlm_mem_to_dlm((memobj), struct dlm_vms_mem, DLM_MAGIC_MEM_VMS)
 #define dlm_vms_to_mem(memobj) (&(memobj)->mem)
 
 struct dlm_mem * dlm_vms_allocate_memory(size_t size);

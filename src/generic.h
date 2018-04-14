@@ -11,7 +11,7 @@ int dlm_mem_generic_copy(struct dlm_mem * restrict src,
 
 void dlm_mem_init(struct dlm_mem *mem,
 		  size_t size,
-		  u32 magic);
+		  magic_t magic);
 
 static inline void dlm_event_init(struct dlm_event *event)
 {

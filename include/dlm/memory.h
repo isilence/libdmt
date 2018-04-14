@@ -33,34 +33,64 @@ struct dlm_mem_ops {
 
 struct dlm_mem {
 	size_t size;
-	u32 magic;
 
 	struct dlm_obj obj;
 	const struct dlm_mem_ops *ops;
 };
 
+static inline magic_t dlm_mem_get_magic(struct dlm_mem *mem)
+{
+	magic_t magic = mem->obj.magic;
+
+	return magic;
+}
+
+static inline bool dlm_obj_is_mem(struct dlm_obj *obj)
+{
+	magic_t magic = obj->magic;
+	bool res = DLM_MAGIC_IS_MEM(magic);
+
+	return res;
+};
+
 static inline int dlm_mem_retain(struct dlm_mem *mem)
 {
+	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(mem)))
+		return -EINVAL;
+
 	return dlm_obj_retain(&mem->obj);
 }
 
 static inline int dlm_mem_release(struct dlm_mem *mem)
 {
+	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(mem)))
+		return -EINVAL;
+
 	return dlm_obj_release(&mem->obj);
 }
 
 static inline void *dlm_mem_map(struct dlm_mem *mem, enum DLM_MEM_MAP_FLAGS flags)
 {
+	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(mem)))
+		return NULL;
+
 	return mem->ops->map(mem, flags);
 }
 
 static inline int dlm_mem_unmap(struct dlm_mem *mem, void *va)
 {
+	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(mem)))
+		return -EINVAL;
+
 	return mem->ops->unmap(mem, va);
 }
 
 static inline int dlm_mem_copy(struct dlm_mem *src, struct dlm_mem *dst)
 {
+	if (!DLM_MAGIC_IS_MEM(dlm_mem_get_magic(src))
+		|| !DLM_MAGIC_IS_MEM(dlm_mem_get_magic(dst)))
+		return -EINVAL;
+
 	return src->ops->copy(src, dst);
 }
 

@@ -6,6 +6,17 @@
 
 #define dlm_obj_to_cl(dlm_obj) dlm_mem_to_cl(dlm_obj_to_mem((dlm_obj)))
 
+static bool is_cl_mem(struct dlm_mem *mem)
+{
+	magic_t magic;
+
+	if (!mem)
+		return false;
+
+	magic = dlm_mem_get_magic(mem);
+	return magic == DLM_MAGIC_MEM_OPENCL;
+}
+
 static int error_cl2unix(cl_int err)
 {
 	int ret;
@@ -47,8 +58,12 @@ static void *
 cl_map(struct dlm_mem *dlm_mem, enum DLM_MEM_MAP_FLAGS flags)
 {
 	void *va;
-	struct dlm_cl_mem *mem = dlm_mem_to_cl(dlm_mem);
+	struct dlm_cl_mem *mem;
 
+	if (!is_cl_mem(dlm_mem))
+		return NULL;
+
+	mem = dlm_mem_to_cl(dlm_mem);
 	va = clEnqueueMapBuffer(mem->queue, mem->clmem,
 				CL_TRUE, memflags_dlm2cl(flags),
 				0, dlm_mem->size,
@@ -62,8 +77,12 @@ cl_map(struct dlm_mem *dlm_mem, enum DLM_MEM_MAP_FLAGS flags)
 static int
 cl_unmap(struct dlm_mem *dlm_mem, void *va)
 {
-	struct dlm_cl_mem *mem = dlm_mem_to_cl(dlm_mem);
+	struct dlm_cl_mem *mem;
 
+	if (!is_cl_mem(dlm_mem))
+		return -EFAULT;
+
+	mem = dlm_mem_to_cl(dlm_mem);
 	mem->err = clEnqueueUnmapMemObject(mem->queue, mem->clmem, va,
 					0, NULL, NULL);
 
@@ -73,7 +92,11 @@ cl_unmap(struct dlm_mem *dlm_mem, void *va)
 static int
 cl_release(struct dlm_obj *dlm_obj)
 {
-	struct dlm_cl_mem *mem = dlm_obj_to_cl(dlm_obj);
+	struct dlm_cl_mem *mem;
+
+	if (!dlm_obj || dlm_obj->magic != DLM_MAGIC_MEM_OPENCL)
+		return -EFAULT;
+	mem = dlm_obj_to_cl(dlm_obj);
 
 	mem->err = clReleaseMemObject(mem->clmem);
 	free(mem);
@@ -93,7 +116,7 @@ static const struct dlm_mem_ops opencl_memory_ops = {
 
 static void init_mem_base(struct dlm_cl_mem *mem, size_t size)
 {
-	dlm_mem_init(&mem->mem, size, DLM_MEM_OPENCL_MAGIC);
+	dlm_mem_init(&mem->mem, size, DLM_MAGIC_MEM_OPENCL);
 	dlm_obj_set_ops(&mem->mem.obj, &cl_obj_ops);
 	mem->mem.ops = &opencl_memory_ops;
 }
@@ -228,7 +251,7 @@ dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
 	if (!mem)
 		return NULL;
 
-	if (master->magic == DLM_MEM_VMS_MAGIC) {
+	if (master->obj.magic == DLM_MAGIC_MEM_VMS) {
 		struct dlm_vms_mem *vms;
 
 		vms = dlm_mem_to_vms(master);
