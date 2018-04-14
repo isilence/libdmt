@@ -9,13 +9,13 @@ if(MSVC)
     endif()
 
 elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
-    set(CMAKE_C_FLAGS "-std=gnu99")
+    set(CMAKE_C_FLAGS "-std=gnu11")
 
     add_definitions(
             -Wall
             -Werror
 
-            -Wno-gnu
+            -Wno-deprecated-declarations
             -Wno-unused-value
             -Wno-pointer-arith
             -Wno-error=unused-but-set-variable
