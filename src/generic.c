@@ -9,7 +9,7 @@ int dlm_mem_generic_copy(struct dlm_mem * restrict src,
 	void *dst_va, *src_va;
 	int ret = -EFAULT;
 
-	if (src->size > dst->size)
+	if (!dlm_mem_copy_size_valid(src, dst))
 		return -ENOSPC;
 
 	src_va = dlm_mem_map(src, DLM_MAP_READ);

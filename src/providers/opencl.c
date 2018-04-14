@@ -89,6 +89,82 @@ cl_unmap(struct dlm_mem *dlm_mem, void *va)
 	return error_cl2unix(mem->err);
 }
 
+static int cl_try_copy_cl2cl(struct dlm_cl_mem *restrict src,
+			     struct dlm_mem *restrict dlm_dst)
+{
+	cl_int ret;
+	struct dlm_cl_mem *dst;
+
+	if (!is_cl_mem(dlm_dst))
+		return -ENOSYS;
+	dst = dlm_mem_to_cl(dlm_dst);
+
+	if (src->context != dst->context || src->queue != dst->queue)
+		return -ENOSYS;
+
+	ret = clEnqueueCopyBuffer(src->queue, src->clmem, dst->clmem,
+				  0, 0, src->mem.size,
+				  0, NULL, NULL);
+	if (ret != CL_SUCCESS)
+		goto error;
+
+	ret = clEnqueueBarrier(src->queue);
+	if (ret != CL_SUCCESS)
+		goto error;
+
+	return 0;
+error:
+	return error_cl2unix(ret);
+}
+
+static int cl_copy_generic(struct dlm_cl_mem * restrict src,
+			   struct dlm_mem * restrict dst)
+{
+	void *dst_va;
+	int unmap_err, ret = -EFAULT;
+	cl_int clret;
+
+	dst_va = dlm_mem_map(dst, DLM_MAP_WRITE);
+	if (!dst_va)
+		goto exit_foo;
+
+	clret = clEnqueueReadBuffer(src->queue, src->clmem, CL_TRUE,
+					0, src->mem.size,
+					dst_va, 0, NULL, NULL);
+	if (clret != CL_SUCCESS) {
+		ret = error_cl2unix(ret);
+		goto unmap_dst;
+	}
+
+	ret = 0;
+unmap_dst:
+	unmap_err = dlm_mem_unmap(dst, dst_va);
+	if (!ret)
+		ret = unmap_err;
+exit_foo:
+	return ret;
+}
+
+static int cl_copy(struct dlm_mem * restrict src,
+		   struct dlm_mem * restrict dst)
+{
+	struct dlm_cl_mem *mem;
+	int ret;
+
+	if (!is_cl_mem(src) || !dst)
+		return -EFAULT;
+	if (!dlm_mem_copy_size_valid(src, dst))
+		return -ENOSPC;
+
+	mem = dlm_mem_to_cl(src);
+
+	ret = cl_try_copy_cl2cl(mem, dst);
+	if (ret != -ENOSYS)
+		return ret;
+
+	return cl_copy_generic(mem, dst);
+}
+
 static int
 cl_release(struct dlm_obj *dlm_obj)
 {
@@ -111,7 +187,7 @@ static const struct dlm_obj_ops cl_obj_ops = {
 static const struct dlm_mem_ops opencl_memory_ops = {
 	.map = cl_map,
 	.unmap = cl_unmap,
-	.copy = dlm_mem_generic_copy,
+	.copy = cl_copy,
 };
 
 static void init_mem_base(struct dlm_cl_mem *mem, size_t size)
