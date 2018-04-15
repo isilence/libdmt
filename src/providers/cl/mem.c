@@ -3,38 +3,14 @@
 #include <dlm/providers/vms.h>
 #include <string.h>
 
-#include "generic.h"
+#include "common.h"
+#include "cl_event.h"
 
 #define dlm_obj_to_cl(dlm_obj) dlm_mem_to_cl(dlm_obj_to_mem((dlm_obj)))
 
 static inline bool is_cl_mem(struct dlm_mem *mem)
 {
 	return dlm_mem_get_magic(mem) == DLM_MAGIC_MEM_OPENCL;
-}
-
-static int error_cl2unix(cl_int err)
-{
-	int ret;
-
-	switch (err) {
-		case CL_SUCCESS:
-			ret = 0;
-			break;
-		case CL_OUT_OF_HOST_MEMORY:
-			ret = -ENOMEM;
-			break;
-		case CL_OUT_OF_RESOURCES:
-			ret = -ENOSPC;
-			break;
-		case CL_MEM_OBJECT_ALLOCATION_FAILURE:
-			ret = -EFAULT;
-			break;
-		/* case CL_MAP_FAILURE: */
-		default:
-			ret = -EINVAL;
-	}
-
-	return ret;
 }
 
 static cl_mem_flags memflags_dlm2cl(int flags)
@@ -53,7 +29,7 @@ static void * cl_map(struct dlm_mem *dlm_mem,
 		     enum DLM_MEM_MAP_FLAGS flags)
 {
 	void *va;
-	struct dlm_cl_mem *mem;
+	struct dlm_mem_cl *mem;
 
 	if (!is_cl_mem(dlm_mem))
 		return NULL;
@@ -71,7 +47,7 @@ static void * cl_map(struct dlm_mem *dlm_mem,
 
 static int cl_unmap(struct dlm_mem *dlm_mem, void *va)
 {
-	struct dlm_cl_mem *mem;
+	struct dlm_mem_cl *mem;
 
 	if (!is_cl_mem(dlm_mem))
 		return -EFAULT;
@@ -80,14 +56,14 @@ static int cl_unmap(struct dlm_mem *dlm_mem, void *va)
 	mem->err = clEnqueueUnmapMemObject(mem->queue, mem->clmem, va,
 					0, NULL, NULL);
 
-	return error_cl2unix(mem->err);
+	return rc_cl2unix(mem->err);
 }
 
-static int cl_try_copy_cl2cl(struct dlm_cl_mem *restrict src,
+static int cl_try_copy_cl2cl(struct dlm_mem_cl *restrict src,
 			     struct dlm_mem *restrict dlm_dst)
 {
 	cl_int err;
-	struct dlm_cl_mem *dst;
+	struct dlm_mem_cl *dst;
 
 	if (!is_cl_mem(dlm_dst))
 		return -ENOSYS;
@@ -109,10 +85,10 @@ static int cl_try_copy_cl2cl(struct dlm_cl_mem *restrict src,
 	return 0;
 error:
 	src->err = err;
-	return error_cl2unix(err);
+	return rc_cl2unix(err);
 }
 
-static int cl_copy_generic(struct dlm_cl_mem * restrict src,
+static int cl_copy_generic(struct dlm_mem_cl * restrict src,
 			   struct dlm_mem * restrict dst)
 {
 	void *dst_va;
@@ -127,7 +103,7 @@ static int cl_copy_generic(struct dlm_cl_mem * restrict src,
 					0, src->mem.size,
 					dst_va, 0, NULL, NULL);
 	if (clret != CL_SUCCESS) {
-		ret = error_cl2unix(ret);
+		ret = rc_cl2unix(ret);
 		goto unmap_dst;
 	}
 
@@ -143,7 +119,7 @@ exit_foo:
 static int cl_copy(struct dlm_mem * restrict src,
 		   struct dlm_mem * restrict dst)
 {
-	struct dlm_cl_mem *mem = dlm_mem_to_cl(src);
+	struct dlm_mem_cl *mem = dlm_mem_to_cl(src);
 	int ret;
 
 	ret = cl_try_copy_cl2cl(mem, dst);
@@ -153,7 +129,7 @@ static int cl_copy(struct dlm_mem * restrict src,
 	return cl_copy_generic(mem, dst);
 }
 
-static cl_int cl_release_cl_mem(struct dlm_cl_mem *mem)
+static cl_int cl_release_cl_mem(struct dlm_mem_cl *mem)
 {
 	cl_int lerr, err;
 
@@ -182,7 +158,7 @@ static cl_int cl_release_cl_mem(struct dlm_cl_mem *mem)
 	return err;
 }
 
-static cl_int cl_destroy_cl_mem(struct dlm_cl_mem *mem)
+static cl_int cl_destroy_cl_mem(struct dlm_mem_cl *mem)
 {
 	cl_int ret = cl_release_cl_mem(mem);
 
@@ -192,7 +168,7 @@ static cl_int cl_destroy_cl_mem(struct dlm_cl_mem *mem)
 
 static int cl_release(struct dlm_obj *dlm_obj)
 {
-	struct dlm_cl_mem *mem;
+	struct dlm_mem_cl *mem;
 	cl_int err;
 
 	if (dlm_obj->magic != DLM_MAGIC_MEM_OPENCL)
@@ -201,7 +177,7 @@ static int cl_release(struct dlm_obj *dlm_obj)
 	mem = dlm_obj_to_cl(dlm_obj);
 	err = cl_destroy_cl_mem(mem);
 
-	return error_cl2unix(err);
+	return rc_cl2unix(err);
 }
 
 static const struct dlm_obj_ops cl_obj_ops = {
@@ -231,7 +207,7 @@ static const struct dlm_mem_ops opencl_memory_ops = {
  * 	function where \init_cl_mem/\allocate_cl_mem have been called
  */
 
-static cl_int init_mem_ctx(struct dlm_cl_mem *mem,
+static cl_int init_mem_ctx(struct dlm_mem_cl *mem,
 			   const struct dlm_mem_cl_context *ctx)
 {
 	cl_int ret;
@@ -254,7 +230,7 @@ static cl_int init_mem_ctx(struct dlm_cl_mem *mem,
 	return CL_SUCCESS;
 }
 
-static cl_int init_cl_mem(struct dlm_cl_mem *mem,
+static cl_int init_cl_mem(struct dlm_mem_cl *mem,
 			  const struct dlm_mem_cl_context *ctx)
 {
 	cl_int ret;
@@ -272,11 +248,11 @@ static cl_int init_cl_mem(struct dlm_cl_mem *mem,
 	return CL_SUCCESS;
 }
 
-static struct dlm_cl_mem *allocate_cl_mem(const struct dlm_mem_cl_context *ctx)
+static struct dlm_mem_cl *allocate_cl_mem(const struct dlm_mem_cl_context *ctx)
 {
-	struct dlm_cl_mem *mem;
+	struct dlm_mem_cl *mem;
 
-	mem = (struct dlm_cl_mem *)malloc(sizeof(*mem));
+	mem = (struct dlm_mem_cl *)malloc(sizeof(*mem));
 	if (!mem)
 		return NULL;
 
@@ -284,7 +260,7 @@ static struct dlm_cl_mem *allocate_cl_mem(const struct dlm_mem_cl_context *ctx)
 	return mem;
 }
 
-static void set_clmem(struct dlm_cl_mem *mem,
+static void set_clmem(struct dlm_mem_cl *mem,
 		      cl_mem clmem,
 		      size_t size)
 {
@@ -299,7 +275,7 @@ static void set_clmem(struct dlm_cl_mem *mem,
  */
 
 static int
-dlm_cl_allocate_memory_ex(struct dlm_cl_mem *mem,
+dlm_cl_allocate_memory_ex(struct dlm_mem_cl *mem,
 			  const struct dlm_mem_cl_context *ctx,
 			  size_t size,
 			  void *host_ptr,
@@ -318,11 +294,11 @@ dlm_cl_allocate_memory_ex(struct dlm_cl_mem *mem,
 	return 0;
 error:
 	mem->err = err;
-	return error_cl2unix(err);
+	return rc_cl2unix(err);
 }
 
 static int
-dlm_cl_create_memory(struct dlm_cl_mem *mem,
+dlm_cl_create_memory(struct dlm_mem_cl *mem,
 		     const struct dlm_mem_cl_context *ctx,
 		     size_t size,
 		     cl_mem_flags flags)
@@ -336,7 +312,7 @@ dlm_cl_allocate_memory(const struct dlm_mem_cl_context *ctx,
 		       cl_mem_flags flags)
 {
 	int err;
-	struct dlm_cl_mem *mem;
+	struct dlm_mem_cl *mem;
 
 	mem = allocate_cl_mem(ctx);
 	if (!mem)
@@ -354,7 +330,7 @@ struct dlm_mem *
 dlm_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx,
 			 cl_mem clmem)
 {
-	struct dlm_cl_mem *mem = NULL;
+	struct dlm_mem_cl *mem = NULL;
 	cl_int ret;
 	size_t size;
 
@@ -381,7 +357,7 @@ error:
 }
 
 
-static int create_from_vms(struct dlm_cl_mem *mem,
+static int create_from_vms(struct dlm_mem_cl *mem,
 			   struct dlm_vms_mem *vms,
 			   const struct dlm_mem_cl_context *ctx,
 			   cl_mem_flags flags)
@@ -403,7 +379,7 @@ struct dlm_mem * dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
 				    struct dlm_mem *master,
 				    cl_mem_flags flags)
 {
-	struct dlm_cl_mem *mem;
+	struct dlm_mem_cl *mem;
 	int err = 0;
 
 	mem = allocate_cl_mem(ctx);

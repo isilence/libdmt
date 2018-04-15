@@ -5,7 +5,7 @@
 
 #include <dlm/memory.h>
 
-struct dlm_ib_mem {
+struct dlm_mem_ib {
 	struct dlm_mem mem;
 	struct dlm_mem *vms;
 
@@ -14,7 +14,7 @@ struct dlm_ib_mem {
 };
 
 #define dlm_mem_to_ib(memobj) \
-	dlm_mem_to_dlm((memobj), struct dlm_ib_mem, DLM_MAGIC_MEM_IB)
+	dlm_mem_to_dlm((memobj), struct dlm_mem_ib, DLM_MAGIC_MEM_IB)
 #define dlm_ib_to_mem(memobj) (&(memobj)->mem)
 
 struct dlm_mem *dlm_ib_allocate_memory(struct ibv_pd *pd,

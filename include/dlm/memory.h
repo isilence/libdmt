@@ -1,17 +1,20 @@
 #ifndef DLM_MEMORY_H__
 #define DLM_MEMORY_H__
 
-#include <stddef.h>
-#include <errno.h>
-#include <dlm/list.h>
-#include <dlm/compiler.h>
+#include <env/dlm/compiler.h>
 #include <dlm/object.h>
-typedef unsigned int u32;
 
-struct dlm_mem_ops;
-struct dlm_mem;
-struct dlm_event_ops;
-struct dlm_event;
+/* memory */
+
+#define DLM_MAGIC_MEM_BASE DLM_MAGIC_BASE_CREATE(0xDEE9)
+#define DLM_MAGIC_IS_MEM(magic) \
+	(DLM_MAGIC_BASE_EXTRACT(magic) == DLM_MAGIC_MEM_BASE)
+#define DLM_MAGIC_MEM_CREATE(num) \
+	DLM_MAGIC_CREATE(DLM_MAGIC_MEM_BASE, num)
+
+#define DLM_MAGIC_MEM_VMS	DLM_MAGIC_MEM_CREATE(11)
+#define DLM_MAGIC_MEM_OPENCL	DLM_MAGIC_MEM_CREATE(22)
+#define DLM_MAGIC_MEM_IB	DLM_MAGIC_MEM_CREATE(33)
 
 enum DLM_MEM_LINK_TYPE {
 	DLM_MEM_LINK_TYPE_FALLBACK = 0,
@@ -22,6 +25,14 @@ enum DLM_MEM_LINK_TYPE {
 enum DLM_MEM_MAP_FLAGS {
 	DLM_MAP_READ	= 0x1,
 	DLM_MAP_WRITE	= 0x2,
+};
+
+struct dlm_sync {
+	struct dlm_event_list *waitfor;
+
+	/* if set return event in \event */
+	bool sync;
+	struct dlm_event *event;
 };
 
 struct dlm_mem_ops {
@@ -91,9 +102,10 @@ static inline int dlm_mem_unmap(struct dlm_mem *mem, void *va)
 	return mem->ops->unmap(mem, va);
 }
 
-static inline int dlm_mem_copy(struct dlm_mem *src, struct dlm_mem *dst)
+static inline int dlm_mem_copy(struct dlm_mem *src,
+			       struct dlm_mem *dst)
 {
-	if (!dlm_mem_valid(src) || !dlm_mem_valid(dst))
+	if (!dlm_mem_valid(src) || !dlm_mem_valid(dst) || src == dst)
 		return -EINVAL;
 	if (!dlm_mem_copy_size_valid(src, dst))
 		return -ENOSPC;
@@ -103,54 +115,5 @@ static inline int dlm_mem_copy(struct dlm_mem *src, struct dlm_mem *dst)
 
 #define dlm_mem_to_dlm(memobj, type, magic) container_of((memobj), type, mem)
 #define dlm_obj_to_mem(dlm_obj) container_of((dlm_obj), struct dlm_mem, obj)
-
-
-
-/*
- * Events
- */
-
-#define DLM_EVENT_INFINITY (~((u32)0))
-
-struct dlm_event_ops {
-	int	(*wait)(struct dlm_event *, u32 ms);
-	int	(*signal)(struct dlm_event *);
-	bool	(*ready)(struct dlm_event *);
-};
-
-struct dlm_event {
-	list_head_t head;
-	list_head_t deps;
-
-	const struct dlm_event_ops *ops;
-	struct dlm_obj obj;
-};
-
-static inline int dlm_event_wait(struct dlm_event *event, u32 ms)
-{
-	return event->ops->wait(event, ms);
-}
-
-static inline int dlm_event_signal(struct dlm_event *event)
-{
-	return event->ops->signal(event);
-}
-
-static inline bool dlm_event_ready(struct dlm_event *event)
-{
-	return event->ops->ready(event);
-}
-
-static inline int dlm_event_retain(struct dlm_event *mem)
-{
-	return dlm_obj_retain(&mem->obj);
-}
-
-static inline int dlm_event_release(struct dlm_event *mem)
-{
-	return dlm_obj_release(&mem->obj);
-}
-
-#define dlm_obj_to_event(dlm_obj) container_of((dlm_obj), struct dlm_event, obj)
 
 #endif /* DLM_MEMORY_H__ */

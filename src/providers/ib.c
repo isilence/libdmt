@@ -2,7 +2,7 @@
 #include <dlm/providers/ib.h>
 #include <dlm/providers/vms.h>
 
-#include "generic.h"
+#include "common.h"
 
 #define dlm_obj_to_ib(dlm_obj) dlm_mem_to_ib(dlm_obj_to_mem((dlm_obj)))
 
@@ -14,7 +14,7 @@ static bool is_ib_mem(struct dlm_mem *mem)
 static void *
 ib_map(struct dlm_mem *dlm_mem, enum DLM_MEM_MAP_FLAGS flags)
 {
-	struct dlm_ib_mem *mem;
+	struct dlm_mem_ib *mem;
 
 	if (!is_ib_mem(dlm_mem))
 		return NULL;
@@ -36,7 +36,7 @@ static int
 ib_release(struct dlm_obj *dlm_obj)
 {
 	int err_mr, err_dlm;
-	struct dlm_ib_mem *mem;
+	struct dlm_mem_ib *mem;
 
 	if (dlm_obj->magic != DLM_MAGIC_MEM_IB)
 		return -EFAULT;
@@ -62,12 +62,12 @@ static const struct dlm_mem_ops ib_memory_ops = {
 struct dlm_mem *
 dlm_ib_allocate_memory(struct ibv_pd *pd, size_t size, int mr_reg_flags)
 {
-	struct dlm_ib_mem *mem;
+	struct dlm_mem_ib *mem;
 	struct dlm_mem *vms_mem;
 	struct dlm_vms_mem *vms;
 	struct ibv_mr *mr;
 
-	mem = (struct dlm_ib_mem *)malloc(sizeof(*mem));
+	mem = (struct dlm_mem_ib *)malloc(sizeof(*mem));
 	if (!mem)
 		return NULL;
 

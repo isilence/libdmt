@@ -2,6 +2,7 @@
 #define DLM_OPENCL_MEMORY_H__
 
 #include <dlm/memory.h>
+#include <dlm/event.h>
 #ifdef __APPLE__
 	#include <OpenCL/opencl.h>
 	#include <OpenCL/cl_ext.h>
@@ -10,7 +11,7 @@
 	#include <CL/cl_ext.h>
 #endif
 
-struct dlm_cl_mem {
+struct dlm_mem_cl {
 	struct dlm_mem mem;
 	struct dlm_mem *master;
 
@@ -23,7 +24,7 @@ struct dlm_cl_mem {
 };
 
 #define dlm_mem_to_cl(memobj) \
-	dlm_mem_to_dlm((memobj), struct dlm_cl_mem, DLM_MAGIC_MEM_OPENCL)
+	dlm_mem_to_dlm((memobj), struct dlm_mem_cl, DLM_MAGIC_MEM_OPENCL)
 #define dlm_cl_to_mem(memobj) (&(memobj)->mem)
 
 struct dlm_mem_cl_context {
@@ -43,5 +44,14 @@ struct dlm_mem *dlm_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx,
 struct dlm_mem *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
 				   struct dlm_mem *master,
 				   cl_mem_flags flags);
+
+struct dlm_event_cl {
+	struct dlm_event event;
+
+	cl_event clevent;
+	bool ready;
+};
+
+#define dlm_event_to_cl(e) container_of((e), struct dlm_event_cl, event)
 
 #endif /* DLM_OPENCL_MEMORY_H__ */

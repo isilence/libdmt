@@ -1,8 +1,7 @@
 #include <stdlib.h>
-#include <dlm/compiler.h>
 #include <dlm/providers/vms.h>
 
-#include "generic.h"
+#include "common.h"
 
 #define dlm_obj_to_vms(dlm_obj) dlm_mem_to_vms(dlm_obj_to_mem((dlm_obj)))
 

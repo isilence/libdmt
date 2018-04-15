@@ -1,6 +1,6 @@
 #ifndef DLM_STDDEF_H__
 #define DLM_STDDEF_H__
-#include <dlm/compiler.h>
+#include <env/dlm/compiler.h>
 
 #define DLM_QUOTE_(str)         #str
 #define DLM_QUOTE(str)          DLM_QUOTE_(str)

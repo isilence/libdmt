@@ -1,8 +1,8 @@
 #ifndef DLM_LIST_H__
 #define DLM_LIST_H__
 
-#include <dlm/poison.h>
-#include <dlm/stddef.h>
+#include <env/dlm/poison.h>
+#include <env/dlm/stddef.h>
 
 DLM_PREDEFINE_CSTRUCT(list_head);
 

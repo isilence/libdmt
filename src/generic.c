@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "generic.h"
+#include "common.h"
 
 int dlm_mem_generic_copy(struct dlm_mem * restrict src,
 			 struct dlm_mem * restrict dst)

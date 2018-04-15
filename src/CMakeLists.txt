@@ -8,24 +8,33 @@ if (${OpenCL_VERSION_STRING} VERSION_LESS "1.2")
 endif()
 find_package(Threads REQUIRED)
 
-include_directories(.)
-include_directories(${DIR_INC})
-include_directories(${OpenCL_INCLUDE_DIRS})
+include_directories(
+        ${DIR_SRC}
+        ${DIR_INC}
+        ${DIR_INC}/env
+        ${OpenCL_INCLUDE_DIRS}
+)
 
 set(SOURCE_FILES
         # extra
-        ${DIR_INC}/dlm/compiler.h
-        ${DIR_INC}/dlm/list.h
-        ${DIR_INC}/dlm/poison.h
-        ${DIR_INC}/dlm/stddef.h
-        ${DIR_INC}/dlm/object.h
-        ${DIR_INC}/dlm/providers/magic.h
+        ${DIR_INC}/env/dlm/compiler.h
+        ${DIR_INC}/env/dlm/list.h
+        ${DIR_INC}/env/dlm/poison.h
+        ${DIR_INC}/env/dlm/stddef.h
+        ${DIR_INC}/env/dlm/magic.h
 
-        # memory
+        # dlm
+        ${DIR_INC}/dlm/object.h
         ${DIR_INC}/dlm/memory.h
-        generic.h
+        ${DIR_INC}/dlm/event.h
+        common.h
         generic.c
-        event_pthread_mtx.c
+
+        events/common.c
+        ${DIR_INC}/dlm/events/latch.h
+        events/latch.c
+        ${DIR_INC}/dlm/events/seq.h
+        events/seq.c
 
         # virtual memory storage
         ${DIR_INC}/dlm/providers/vms.h
@@ -33,7 +42,9 @@ set(SOURCE_FILES
 
         # opencl devices
         ${DIR_INC}/dlm/providers/opencl.h
-        providers/opencl.c
+        providers/cl/mem.c
+        providers/cl/cl_event.h
+        providers/cl/cl_event.c
 
         # infiniband verbs devices
         ${DIR_INC}/dlm/providers/ib.h
