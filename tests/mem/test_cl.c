@@ -50,7 +50,7 @@ static int deinit_opencl(void)
 
 static int test_opencl_setup(void **state)
 {
-	struct dlm_mem *mem;
+	struct dlm_mem_cl *mem;
 	struct dlm_obj *obj;
 	const struct dlm_mem_cl_context ctx = {
 		.device = device,
@@ -62,11 +62,44 @@ static int test_opencl_setup(void **state)
 	if (!mem)
 		return -EFAULT;
 
-	obj = &mem->obj;
+	obj = &mem->mem.obj;
 	*state = (void *)obj;
 
 	return 0;
 }
+
+static inline void test_copy(void **state)
+{
+	struct dlm_mem_vms *vms1, *vms2;
+	struct dlm_mem_cl *cl =
+		dlm_mem_to_cl(dlm_obj_to_mem((struct dlm_obj *)*state));
+
+	assert_true(dlm_obj_is_mem(&cl->mem.obj));
+	assert_non_null(vms1 = dlm_vms_allocate_memory(cl->mem.size));
+	assert_non_null(vms2 = dlm_vms_allocate_memory(cl->mem.size));
+
+	memset(vms2->va, MAGIC_VALUE, vms2->mem.size);
+	test_fill_random(vms1->va, vms1->mem.size);
+
+	char *ss = vms1->va;
+	(void)ss;
+
+	assert_return_code(dlm_mem_copy(&vms1->mem, &cl->mem), 0);
+	dlm_wait_mem(&cl->mem);
+	assert_return_code(cl->mem.err, 0);
+	assert_return_code(vms1->mem.err, 0);
+
+	assert_return_code(dlm_mem_copy(&cl->mem, &vms2->mem), 0);
+	dlm_wait_mem(&vms2->mem);
+	assert_return_code(cl->mem.err, 0);
+	assert_return_code(vms2->mem.err, 0);
+
+	assert_memory_equal(vms1->va, vms2->va, vms1->mem.size);
+
+	dlm_mem_release(&vms1->mem);
+	dlm_mem_release(&vms2->mem);
+}
+
 
 TEST_IMPL_TWIN_INIT(opencl, test_opencl_setup, test_obj_teardown)
 #define opencl_obj_test(foo) \
@@ -86,8 +119,8 @@ int main(void)
 
 	const struct CMUnitTest tests[] = {
 		cmocka_unit_test_setup(test_object_destruction, test_opencl_setup),
-		opencl_obj_test(test_mem_map),
-		cmocka_unit_test_setup_teardown(test_copy, test_opencl_pair_setup, test_opencl_pair_teardown),
+		opencl_obj_test(test_copy),
+		cmocka_unit_test(test_object_root),
 	};
 
 	ret = cmocka_run_group_tests(tests, NULL, NULL);

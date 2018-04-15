@@ -1,12 +1,25 @@
+#include <unistd.h>
+#include <sys/eventfd.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <dlm/providers/opencl.h>
 #include <dlm/providers/vms.h>
 
-#include <string.h>
-
-#include "common.h"
+#include "generic.h"
 
 #define dlm_obj_to_cl(dlm_obj) dlm_mem_to_cl(dlm_obj_to_mem((dlm_obj)))
+
+typedef CL_API_ENTRY cl_int CL_API_CALL
+(*clEnqueueBuffer_t)(cl_command_queue   /* command_queue */,
+		     cl_mem             /* buffer */,
+		     cl_bool            /* blocking_write */,
+		     size_t             /* offset */,
+		     size_t             /* size */,
+		     const void *       /* ptr */,
+		     cl_uint            /* num_events_in_wait_list */,
+		     const cl_event *   /* event_wait_list */,
+		     cl_event *         /* event */);
 
 static int rc_cl2unix(cl_int err)
 {
@@ -38,120 +51,120 @@ static inline bool is_cl_mem(struct dlm_mem *mem)
 	return dlm_mem_get_magic(mem) == DLM_MAGIC_MEM_OPENCL;
 }
 
-static cl_mem_flags memflags_dlm2cl(int flags)
+static void CL_CALLBACK copy_clb(cl_event event, cl_int rc, void *data)
 {
-	cl_mem_flags res = 0;
+	struct dlm_mem **ms = (struct dlm_mem **)data;
 
-	if (flags & DLM_MAP_READ)
-		res |= CL_MAP_READ;
-	if (flags & DLM_MAP_WRITE)
-		res |= CL_MAP_WRITE;
+	if (rc != CL_SUCCESS) {
+		int ret = rc_cl2unix(rc);
 
-	return res;
-}
+		ms[0]->err = ret;
+		ms[1]->err = ret;
+	}
 
-static void * cl_map(struct dlm_mem *dlm_mem,
-		     enum DLM_MEM_MAP_FLAGS flags)
-{
-	void *va;
-	struct dlm_mem_cl *mem;
-
-	if (!is_cl_mem(dlm_mem))
-		return NULL;
-
-	mem = dlm_mem_to_cl(dlm_mem);
-	va = clEnqueueMapBuffer(mem->queue, mem->clmem,
-				CL_TRUE, memflags_dlm2cl(flags),
-				0, dlm_mem->size,
-				0, NULL, NULL, &mem->err);
-
-	if (mem->err != CL_SUCCESS)
-		return NULL;
-	return va;
-}
-
-static int cl_unmap(struct dlm_mem *dlm_mem, void *va)
-{
-	struct dlm_mem_cl *mem;
-
-	if (!is_cl_mem(dlm_mem))
-		return -EFAULT;
-
-	mem = dlm_mem_to_cl(dlm_mem);
-	mem->err = clEnqueueUnmapMemObject(mem->queue, mem->clmem, va,
-					0, NULL, NULL);
-
-	return rc_cl2unix(mem->err);
+	dlm_mem_eventfd_unlock(ms[0]);
+	dlm_mem_eventfd_unlock(ms[1]);
+	clReleaseEvent(event);
+	free(data);
 }
 
 static int cl_try_copy_cl2cl(struct dlm_mem_cl *restrict src,
 			     struct dlm_mem *restrict dlm_dst)
 {
-	cl_int err;
+	cl_int err = CL_INVALID_VALUE;
+	cl_event event;
 	struct dlm_mem_cl *dst;
+	struct dlm_mem **pair = NULL;
 
 	if (!is_cl_mem(dlm_dst))
 		return -ENOSYS;
-	dst = dlm_mem_to_cl(dlm_dst);
 
+	dst = dlm_mem_to_cl(dlm_dst);
 	if (src->context != dst->context || src->queue != dst->queue)
 		return -ENOSYS;
 
+	pair = (struct dlm_mem **)malloc(sizeof(*pair) * 2);
+	pair[0] = &src->mem;
+	pair[1] = &dst->mem;
+
+	if (!dlm_mem_eventfd_lock_pair(&src->mem, &dst->mem))
+		goto error;
+
 	err = clEnqueueCopyBuffer(src->queue, src->clmem, dst->clmem,
 				  0, 0, src->mem.size,
-				  0, NULL, NULL);
+				  0, NULL, &event);
 	if (err != CL_SUCCESS)
 		goto error;
 
-	err = clEnqueueBarrier(src->queue);
-	if (err != CL_SUCCESS)
+	err = clSetEventCallback(event, CL_SUCCESS, copy_clb, (void *)pair);
+	if (err)
 		goto error;
 
 	return 0;
 error:
+	if (pair && err != CL_SUCCESS)
+		free(pair);
 	src->err = err;
 	return rc_cl2unix(err);
 }
 
-static int cl_copy_generic(struct dlm_mem_cl * restrict src,
-			   struct dlm_mem * restrict dst)
+static int cl_try_copy_cl_vms(struct dlm_mem_cl *restrict cl,
+			      struct dlm_mem *restrict dlm_mem,
+			      enum DLM_COPY_DIR dir)
 {
-	void *dst_va;
-	int unmap_err, ret = -EFAULT;
-	cl_int clret;
+	cl_int err = CL_INVALID_VALUE;
+	cl_event event;
+	struct dlm_mem_vms *vms;
+	struct dlm_mem **pair = NULL;
+	clEnqueueBuffer_t foo;
 
-	dst_va = dlm_mem_map(dst, DLM_MAP_WRITE);
-	if (!dst_va)
-		goto exit_foo;
+	if (!is_mem_vms(dlm_mem))
+		return -ENOSYS;
 
-	clret = clEnqueueReadBuffer(src->queue, src->clmem, CL_TRUE,
-					0, src->mem.size,
-					dst_va, 0, NULL, NULL);
-	if (clret != CL_SUCCESS) {
-		ret = rc_cl2unix(ret);
-		goto unmap_dst;
-	}
+	vms = dlm_mem_to_vms(dlm_mem);
+	pair = (struct dlm_mem **)malloc(sizeof(*pair) * 2);
+	pair[0] = &cl->mem;
+	pair[1] = &vms->mem;
 
-	ret = 0;
-unmap_dst:
-	unmap_err = dlm_mem_unmap(dst, dst_va);
-	if (!ret)
-		ret = unmap_err;
-exit_foo:
-	return ret;
+	if (dlm_mem_eventfd_lock_pair(&cl->mem, &vms->mem))
+		goto error;
+
+	foo = (clEnqueueBuffer_t)((dir == DLM_COPY_FORWARD)
+		? (clEnqueueBuffer_t)clEnqueueReadBuffer: clEnqueueWriteBuffer);
+	err = foo(cl->queue, cl->clmem, CL_FALSE,
+				0, cl->mem.size, vms->va,
+				0, NULL, &event);
+	if (err != CL_SUCCESS)
+		goto error;
+
+	err = clSetEventCallback(event, CL_SUCCESS, copy_clb, (void *)pair);
+	if (err)
+		goto error;
+
+	return 0;
+error:
+	if (pair && err != CL_SUCCESS)
+		free(pair);
+	cl->err = err;
+	return rc_cl2unix(err);
 }
 
 static int cl_copy(struct dlm_mem * restrict src,
-		   struct dlm_mem * restrict dst)
+		   struct dlm_mem * restrict dst,
+		   enum DLM_COPY_DIR dir)
 {
-	struct dlm_mem_cl *mem = dlm_mem_to_cl(src);
+	struct dlm_mem_cl *mem;
 	int ret;
+
+	if (!is_cl_mem(src))
+		return -EINVAL;
+	mem = dlm_mem_to_cl(src);
 
 	ret = cl_try_copy_cl2cl(mem, dst);
 	if (ret != -ENOSYS)
 		goto finalise;
 
-	ret = cl_copy_generic(mem, dst);
+	ret = cl_try_copy_cl_vms(mem, dst, dir);
 	if (ret != -ENOSYS)
 		goto finalise;
 
@@ -160,38 +173,44 @@ finalise:
 	return ret;
 }
 
-static cl_int cl_release_cl_mem(struct dlm_mem_cl *mem)
+static int cl_release_cl_mem(struct dlm_mem_cl *mem)
 {
-	cl_int lerr, err;
+	cl_int ret, err;
+	int rc = 0;
 
 	err = clReleaseMemObject(mem->clmem);
 	if (mem->queue != NULL) {
-		lerr = clReleaseCommandQueue(mem->queue);
-		err = err ? err : lerr;
+		ret = clReleaseCommandQueue(mem->queue);
+		err = err ? err : ret;
 	}
 	if (mem->context != NULL) {
-		lerr = clReleaseContext(mem->context);
-		err = err ? err : lerr;
+		ret = clReleaseContext(mem->context);
+		err = err ? err : ret;
 	}
 	if (mem->dev != NULL) {
-		lerr = clReleaseDevice(mem->dev);
-		err = err ? err : lerr;
+		ret = clReleaseDevice(mem->dev);
+		err = err ? err : ret;
 	}
 	if (mem->master) {
 		dlm_mem_release(mem->master);
 		mem->master = NULL;
 	}
+	if (mem->mem.fd >= 0) {
+		rc = close(mem->mem.fd);
+	}
 
+	mem->mem.fd = -1;
 	mem->queue = NULL;
 	mem->context = NULL;
 	mem->dev = NULL;
 	mem->clmem = NULL;
-	return err;
+
+	return rc ? rc : rc_cl2unix(err);
 }
 
-static cl_int cl_destroy_cl_mem(struct dlm_mem_cl *mem)
+static int cl_destroy_cl_mem(struct dlm_mem_cl *mem)
 {
-	cl_int ret = cl_release_cl_mem(mem);
+	int ret = cl_release_cl_mem(mem);
 
 	free(mem);
 	return ret;
@@ -213,9 +232,7 @@ static const struct dlm_obj_ops cl_obj_ops = {
 };
 
 static const struct dlm_mem_ops opencl_memory_ops = {
-	.map = cl_map,
-	.unmap = cl_unmap,
-	.copy = cl_copy,
+	.copy = cl_copy
 };
 
 /**
@@ -235,22 +252,22 @@ static const struct dlm_mem_ops opencl_memory_ops = {
  * 	function where \init_cl_mem/\allocate_cl_mem have been called
  */
 
-static cl_int init_mem_ctx(struct dlm_mem_cl *mem,
-			   const struct dlm_mem_cl_context *ctx)
+static cl_int init_mem_from_ctx(struct dlm_mem_cl *mem,
+				const struct dlm_mem_cl_context *ctx)
 {
 	cl_int ret;
 
-	ret = clRetainCommandQueue(mem->queue);
+	ret = clRetainCommandQueue(ctx->queue);
 	if (ret != CL_SUCCESS)
 		return ret;
 	mem->queue = ctx->queue;
 
-	ret = clRetainContext(mem->context);
+	ret = clRetainContext(ctx->context);
 	if (ret != CL_SUCCESS)
 		return ret;
 	mem->context = ctx->context;
 
-	ret = clRetainDevice(mem->dev);
+	ret = clRetainDevice(ctx->device);
 	if (ret != CL_SUCCESS)
 		return ret;
 	mem->dev = ctx->device;
@@ -258,16 +275,22 @@ static cl_int init_mem_ctx(struct dlm_mem_cl *mem,
 	return CL_SUCCESS;
 }
 
-static cl_int init_cl_mem(struct dlm_mem_cl *mem,
-			  const struct dlm_mem_cl_context *ctx)
+static int init_cl_mem(struct dlm_mem_cl *mem,
+		       const struct dlm_mem_cl_context *ctx)
 {
 	cl_int ret;
 
 	memset((void *)mem, 0, sizeof(*mem));
+	mem->mem.fd = -1;
+	mem->busy = false;
 
-	ret = init_mem_ctx(mem, ctx);
-	if (!ret)
-		return ret;
+	ret = init_mem_from_ctx(mem, ctx);
+	if (ret != CL_SUCCESS)
+		return rc_cl2unix(ret);
+
+	mem->mem.fd = eventfd(666, EFD_CLOEXEC);
+	if (mem->mem.fd < 0)
+		return errno;
 
 	dlm_mem_init(&mem->mem, 0, DLM_MAGIC_MEM_OPENCL);
 	dlm_obj_set_ops(&mem->mem.obj, &cl_obj_ops);
@@ -334,7 +357,7 @@ dlm_cl_create_memory(struct dlm_mem_cl *mem,
 	return dlm_cl_allocate_memory_ex(mem, ctx, size, NULL, flags);
 }
 
-struct dlm_mem *
+struct dlm_mem_cl *
 dlm_cl_allocate_memory(const struct dlm_mem_cl_context *ctx,
 		       size_t size,
 		       cl_mem_flags flags)
@@ -347,14 +370,13 @@ dlm_cl_allocate_memory(const struct dlm_mem_cl_context *ctx,
 		return NULL;
 
 	err = dlm_cl_create_memory(mem, ctx, size, flags);
-	if (err) {
+	if (err)
 		cl_destroy_cl_mem(mem);
-		return NULL;
-	}
-	return &mem->mem;
+
+	return mem;
 }
 
-struct dlm_mem *
+struct dlm_mem_cl *
 dlm_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx,
 			 cl_mem clmem)
 {
@@ -377,7 +399,7 @@ dlm_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx,
 	set_clmem(mem, clmem, size);
 	dlm_mem_retain(&mem->mem);
 
-	return dlm_cl_to_mem(mem);
+	return mem;
 error:
 	if (mem)
 		cl_destroy_cl_mem(mem);
@@ -386,7 +408,7 @@ error:
 
 
 static int create_from_vms(struct dlm_mem_cl *mem,
-			   struct dlm_vms_mem *vms,
+			   struct dlm_mem_vms *vms,
 			   const struct dlm_mem_cl_context *ctx,
 			   cl_mem_flags flags)
 {
@@ -403,9 +425,9 @@ static int create_from_vms(struct dlm_mem_cl *mem,
 	return err;
 }
 
-struct dlm_mem * dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
-				    struct dlm_mem *master,
-				    cl_mem_flags flags)
+struct dlm_mem_cl *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
+				      struct dlm_mem *master,
+				      cl_mem_flags flags)
 {
 	struct dlm_mem_cl *mem;
 	int err = 0;
@@ -415,7 +437,7 @@ struct dlm_mem * dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
 		return NULL;
 
 	if (master->obj.magic == DLM_MAGIC_MEM_VMS) {
-		struct dlm_vms_mem *vms = dlm_mem_to_vms(master);
+		struct dlm_mem_vms *vms = dlm_mem_to_vms(master);
 
 		err = create_from_vms(mem, vms, ctx, flags);
 		if (err != -ENOSYS)
@@ -428,5 +450,5 @@ clean:
 		cl_destroy_cl_mem(mem);
 		return NULL;
 	}
-	return dlm_cl_to_mem(mem);
+	return mem;
 }

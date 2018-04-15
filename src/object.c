@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define DEBUG_TOKEN "[DLM][OBJ] "
+
+
 static void dlm_root_release(struct dlm_obj *obj)
 {
 	fprintf(stderr, "[DLM][ERROR] Attempt to delete root object\n");
@@ -10,7 +13,7 @@ static void dlm_root_release(struct dlm_obj *obj)
 struct dlm_obj root = {
 	.node = LIST_HEAD_INIT(root.node),
 	.deps = LIST_HEAD_INIT(root.deps),
-	.master = NULL,
+	.parent = NULL,
 	.magic = DLM_MAGIC_ROOT,
 	.nref = 1,
 	.release = dlm_root_release
@@ -18,25 +21,27 @@ struct dlm_obj root = {
 
 void dlm_obj_retain(struct dlm_obj *obj)
 {
-	obj->nref += 1;
+	atomic_fetch_add(&obj->nref, 1);
 }
 
 void dlm_obj_release(struct dlm_obj *obj)
 {
 	struct dlm_obj *master;
+	int nref_old;
 
-	if (!obj || obj->nref <= 0)
+	nref_old = atomic_fetch_sub(&obj->nref, 1);
+	if (nref_old <= 0) {
+		fprintf(stderr, DEBUG_TOKEN "Invalid ref counting");
 		return;
+	}
 
-	obj->nref -= 1;
-	if (obj->nref != 0)
-		return;
-
-	master = obj->master;
-	list_del(&obj->node);
-	obj->release(obj);
-	if (master)
-		dlm_obj_release(master);
+	if (nref_old == 1) {
+		master = obj->parent;
+		list_del(&obj->node);
+		obj->release(obj);
+		if (master)
+			dlm_obj_release(master);
+	}
 }
 
 void dlm_obj_init(struct dlm_obj *obj, struct dlm_obj *master)
@@ -44,9 +49,9 @@ void dlm_obj_init(struct dlm_obj *obj, struct dlm_obj *master)
 	dlm_obj_retain(master);
 	list_add(&obj->node, &master->deps);
 	INIT_LIST_HEAD(&obj->deps);
-	obj->master = master;
+	obj->parent = master;
 
 	obj->magic = DLM_MAGIC_UNDEFINED;
-	obj->nref = 0;
 	obj->release = NULL;
+	atomic_init(&obj->nref, 0);
 }

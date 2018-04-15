@@ -1,13 +1,15 @@
 #ifndef DLM_TESTS_TEST_MEM_H__
 #define DLM_TESTS_TEST_MEM_H__
 
+#include <poll.h>
 #include <dlm/memory.h>
 #include <dlm/providers/vms.h>
 
 #include "../test_base.h"
+#include "generic.h"
 
 #define PAGE_SIZE 4096
-#define MEM_TEST_SIZE (PAGE_SIZE * 32)
+#define MEM_TEST_SIZE (PAGE_SIZE * 2048)
 
 static void (*old_release)(struct dlm_obj *);
 static int is_released_called_cnt;
@@ -42,56 +44,22 @@ static inline void test_object_destruction(void **state)
 	assert_int_equal(is_released_called_cnt, 1);
 }
 
-static inline void test_mem_map(void **state)
+static inline int dlm_wait_mem(struct dlm_mem *mem)
 {
-	struct dlm_obj *obj = (struct dlm_obj *)*state;
-	struct dlm_mem *mem = dlm_obj_to_mem(obj);
-	char *va, *tmp;
+	int ret;
+	struct pollfd pfd = {
+		.fd = mem->fd,
+		.events = POLLIN | POLLOUT,
+	};
 
-	assert_true(mem->size >= MEM_TEST_SIZE);
-	assert_non_null((tmp = malloc(mem->size)));
-	test_fill_random(tmp, mem->size);
+	ret = poll(&pfd, 1, 0);
+	if (!ret)
+		return ret;
 
-	assert_non_null((va = dlm_mem_map(mem, DLM_MAP_WRITE)));
-	memcpy(va, tmp, mem->size);
+	if (!(pfd.revents & POLLIN))
+		return -EFAULT;
 
-	assert_return_code(dlm_mem_unmap(mem, va), 0);
-	assert_non_null((va = dlm_mem_map(mem, DLM_MAP_READ)));
-	assert_memory_equal(va, tmp, mem->size);
-	assert_return_code(dlm_mem_unmap(mem, va), 0);
-
-	free(tmp);
-}
-
-static inline void test_copy(void **state)
-{
-	struct dlm_obj **pair = (struct dlm_obj **)*state;
-	char *src_va, *dst_va;
-	struct dlm_mem *src, *dst;
-
-	assert_true(dlm_obj_is_mem(pair[0]));
-	assert_true(dlm_obj_is_mem(pair[1]));
-
-	src = dlm_obj_to_mem(pair[0]);
-	dst = dlm_obj_to_mem(pair[1]);
-
-	assert_true(src->size == dst->size);
-	assert_non_null((src_va = dlm_mem_map(src, DLM_MAP_WRITE)));
-	assert_non_null((dst_va = dlm_mem_map(dst, DLM_MAP_WRITE)));
-
-	memset(dst_va, MAGIC_VALUE, dst->size);
-	test_fill_random(src_va, src->size);
-
-	assert_return_code(dlm_mem_unmap(src, src_va), 0);
-	assert_return_code(dlm_mem_unmap(dst, dst_va), 0);
-	assert_return_code(dlm_mem_copy(src, dst), 0);
-
-	assert_non_null((src_va = dlm_mem_map(src, DLM_MAP_READ)));
-	assert_non_null((dst_va = dlm_mem_map(dst, DLM_MAP_READ)));
-	assert_memory_equal(src_va, dst_va, src->size);
-
-	assert_return_code(dlm_mem_unmap(src, src_va), 0);
-	assert_return_code(dlm_mem_unmap(dst, dst_va), 0);
+	return 0;
 }
 
 static inline int

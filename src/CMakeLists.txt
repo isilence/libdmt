@@ -8,36 +8,33 @@ if (${OpenCL_VERSION_STRING} VERSION_LESS "1.2")
 endif()
 find_package(Threads REQUIRED)
 
-include_directories(
-        ${DIR_SRC}
-        ${DIR_INC}
-        ${DIR_INC}/env
-        ${OpenCL_INCLUDE_DIRS}
-)
+include_directories(${DIR_SRC})
+include_directories(${DIR_INC})
+include_directories(${DIR_INC}/env/)
+include_directories(${OpenCL_INCLUDE_DIRS})
 
 set(SOURCE_FILES
         # extra
-        ${DIR_INC}/env/dlm/compiler.h
-        ${DIR_INC}/env/dlm/list.h
-        ${DIR_INC}/env/dlm/poison.h
-        ${DIR_INC}/env/dlm/stddef.h
-        ${DIR_INC}/env/dlm/magic.h
+        ${DIR_INC}/linux/list.h
+        ${DIR_INC}/linux/poison.h
+
+        ${DIR_INC}/dlm/compiler.h
+        ${DIR_INC}/dlm/stddef.h
+        ${DIR_INC}/dlm/magic.h
 
         # dlm
         ${DIR_INC}/dlm/object.h
         ${DIR_INC}/dlm/memory.h
-        common.h
+        generic.h
         generic.c
         object.c
 
         # virtual memory storage
         ${DIR_INC}/dlm/providers/vms.h
         providers/vms.c
-
         # opencl devices
         ${DIR_INC}/dlm/providers/opencl.h
         providers/opencl.c
-
         # infiniband verbs devices
         ${DIR_INC}/dlm/providers/ib.h
         providers/ib.c

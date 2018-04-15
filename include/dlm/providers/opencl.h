@@ -20,11 +20,11 @@ struct dlm_mem_cl {
 	cl_mem			clmem;
 
 	cl_int			err;
+	bool			busy;
 };
 
 #define dlm_mem_to_cl(memobj) \
 	dlm_mem_to_dlm((memobj), struct dlm_mem_cl, DLM_MAGIC_MEM_OPENCL)
-#define dlm_cl_to_mem(memobj) (&(memobj)->mem)
 
 struct dlm_mem_cl_context {
 	cl_device_id		device;
@@ -32,16 +32,15 @@ struct dlm_mem_cl_context {
 	cl_command_queue	queue;
 };
 
-struct dlm_mem *dlm_cl_allocate_memory( const struct dlm_mem_cl_context *ctx,
-					size_t size,
-					cl_mem_flags flags);
+struct dlm_mem_cl *dlm_cl_allocate_memory(const struct dlm_mem_cl_context *ctx,
+					  size_t size,
+					  cl_mem_flags flags);
 
-struct dlm_mem *dlm_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx,
-					 cl_mem clmem);
+struct dlm_mem_cl *
+dlm_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx, cl_mem clmem);
 
-
-struct dlm_mem *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
-				   struct dlm_mem *master,
-				   cl_mem_flags flags);
+struct dlm_mem_cl *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
+				      struct dlm_mem *master,
+				      cl_mem_flags flags);
 
 #endif /* DLM_OPENCL_MEMORY_H__ */
