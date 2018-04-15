@@ -13,7 +13,7 @@ struct dlm_event_latch {
 	atomic_bool ready;
 };
 
-struct dlm_event_latch *dlm_event_latch_create(void);
+struct dlm_event_latch *dlm_event_latch_create(struct dlm_obj *master);
 
 #define dlm_event_to_latch(e) container_of((e), struct dlm_event_latch, event)
 

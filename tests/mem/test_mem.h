@@ -9,13 +9,19 @@
 #define PAGE_SIZE 4096
 #define MEM_TEST_SIZE (PAGE_SIZE * 32)
 
-static int (*old_release)(struct dlm_obj *);
+static void (*old_release)(struct dlm_obj *);
 static int is_released_called_cnt;
 
-static inline int check_release(struct dlm_obj *obj) {
+static inline void check_release(struct dlm_obj *obj) {
 	is_released_called_cnt += 1;
-	return old_release(obj);
+	old_release(obj);
 }
+
+static inline void test_object_root(void **state)
+{
+	assert_int_equal(root.nref, 1);
+}
+
 
 static inline void test_object_destruction(void **state)
 {
@@ -28,11 +34,11 @@ static inline void test_object_destruction(void **state)
 	dlm_obj_set_ops(obj, &ops);
 
 	is_released_called_cnt = 0;
-	assert_return_code(dlm_obj_retain(obj), 0);
+	dlm_obj_retain(obj);
 	assert_int_equal(is_released_called_cnt, 0);
-	assert_return_code(dlm_obj_release(obj), 0);
+	dlm_obj_release(obj);
 	assert_int_equal(is_released_called_cnt, 0);
-	assert_return_code(dlm_obj_release(obj), 0);
+	dlm_obj_release(obj);
 	assert_int_equal(is_released_called_cnt, 1);
 }
 

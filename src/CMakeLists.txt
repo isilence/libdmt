@@ -29,6 +29,7 @@ set(SOURCE_FILES
         ${DIR_INC}/dlm/event.h
         common.h
         generic.c
+        object.c
 
         events/common.c
         ${DIR_INC}/dlm/events/latch.h

@@ -8,15 +8,12 @@
 #define dlm_obj_to_event_latch(dlm_obj) \
 	dlm_event_to_latch(dlm_obj_to_event((dlm_obj)))
 
-static int latch_release(struct dlm_obj *obj)
+static void latch_release(struct dlm_obj *obj)
 {
-	int ret;
 	struct dlm_event_latch *event = dlm_obj_to_event_latch(obj);
 
-	ret = pthread_mutex_destroy(&event->mtx);
+	(void)pthread_mutex_destroy(&event->mtx);
 	free(event);
-
-	return ret;
 }
 
 static inline bool obj_latch_ready(struct dlm_event_latch *event)
@@ -103,7 +100,7 @@ error:
 	return ret;
 }
 
-struct dlm_event_latch *dlm_event_latch_create(void)
+struct dlm_event_latch *dlm_event_latch_create(struct dlm_obj *master)
 {
 	int ret;
 	struct dlm_event_latch *event;
@@ -117,7 +114,7 @@ struct dlm_event_latch *dlm_event_latch_create(void)
 		goto dealloc;
 
 	dlm_event_init(&event->event, DLM_MAGIC_EVENT_LATCH,
-			&latch_ops, &latch_obj_ops);
+			&latch_ops, &latch_obj_ops, master);
 	atomic_init(&event->ready, false);
 	dlm_event_retain(&event->event);
 

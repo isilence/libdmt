@@ -26,7 +26,8 @@ static inline int test_obj_teardown(void **state)
 {
 	struct dlm_obj *obj = (struct dlm_obj *)*state;
 
-	return dlm_obj_release(obj);
+	dlm_obj_release(obj);
+	return 0;
 }
 
 

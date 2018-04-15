@@ -36,7 +36,7 @@ void dlm_mem_init(struct dlm_mem *mem,
 		  size_t size,
 		  magic_t magic)
 {
-	dlm_obj_init(&mem->obj);
+	dlm_obj_init(&mem->obj, &root);
 
 	mem->obj.magic = magic;
 	mem->size = size;

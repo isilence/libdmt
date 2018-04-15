@@ -166,18 +166,15 @@ static cl_int cl_destroy_cl_mem(struct dlm_mem_cl *mem)
 	return ret;
 }
 
-static int cl_release(struct dlm_obj *dlm_obj)
+static void cl_release(struct dlm_obj *dlm_obj)
 {
 	struct dlm_mem_cl *mem;
-	cl_int err;
 
 	if (dlm_obj->magic != DLM_MAGIC_MEM_OPENCL)
-		return -EFAULT;
+		return;
 
 	mem = dlm_obj_to_cl(dlm_obj);
-	err = cl_destroy_cl_mem(mem);
-
-	return rc_cl2unix(err);
+	cl_destroy_cl_mem(mem);
 }
 
 static const struct dlm_obj_ops cl_obj_ops = {

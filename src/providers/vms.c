@@ -32,19 +32,17 @@ vms_unmap(struct dlm_mem *dlm_mem, void *va)
 	return 0;
 }
 
-static int
+static void
 vms_release(struct dlm_obj *dlm_obj)
 {
 	struct dlm_vms_mem *mem;
 
 	if (dlm_obj->magic != DLM_MAGIC_MEM_VMS)
-		return -EFAULT;
+		return;
 	mem = dlm_obj_to_vms(dlm_obj);
 
 	free(mem->va);
 	free(mem);
-
-	return 0;
 }
 
 static const struct dlm_obj_ops vms_obj_ops = {

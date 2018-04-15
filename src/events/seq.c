@@ -8,12 +8,11 @@
 #define dlm_obj_to_event_seq(dlm_obj) \
 	dlm_event_to_seq(dlm_obj_to_event((dlm_obj)))
 
-static int seq_release(struct dlm_obj *obj)
+static void seq_release(struct dlm_obj *obj)
 {
 	struct dlm_event_seq *event = dlm_obj_to_event_seq(obj);
 
 	free(event);
-	return 0;
 }
 
 static inline bool obj_seq_ready(struct dlm_event_seq *event)
@@ -48,7 +47,7 @@ static const struct dlm_event_ops seq_event_ops = {
 	.ready = seq_ready,
 };
 
-struct dlm_event_seq *dlm_event_seq_create(void)
+struct dlm_event_seq *dlm_event_seq_create(struct dlm_obj *master)
 {
 	struct dlm_event_seq *event;
 
@@ -57,7 +56,7 @@ struct dlm_event_seq *dlm_event_seq_create(void)
 		return NULL;
 
 	dlm_event_init(&event->event, DLM_MAGIC_EVENT_SEQ,
-		       &seq_event_ops, &seq_obj_ops);
+		       &seq_event_ops, &seq_obj_ops, master);
 	dlm_event_retain(&event->event);
 
 	return event;

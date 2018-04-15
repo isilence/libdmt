@@ -32,21 +32,18 @@ ib_unmap(struct dlm_mem *dlm_mem DLM_PARAM_UNUSED, void *va DLM_PARAM_UNUSED)
 	return 0;
 }
 
-static int
+static void
 ib_release(struct dlm_obj *dlm_obj)
 {
-	int err_mr, err_dlm;
 	struct dlm_mem_ib *mem;
 
 	if (dlm_obj->magic != DLM_MAGIC_MEM_IB)
-		return -EFAULT;
+		return;
 	mem = dlm_obj_to_ib(dlm_obj);
 
-	err_mr = ibv_dereg_mr(mem->mr);
-	err_dlm = dlm_mem_release(mem->vms);
+	ibv_dereg_mr(mem->mr);
+	dlm_mem_release(mem->vms);
 	free(mem);
-
-	return err_mr ? err_mr : err_dlm;
 }
 
 static const struct dlm_obj_ops ib_obj_ops = {

@@ -80,19 +80,17 @@ static int event_cl_signal_user(struct dlm_event *dlm_event)
 	return rc_cl2unix(ret);
 }
 
-static int event_cl_release(struct dlm_obj *obj)
+static void event_cl_release(struct dlm_obj *obj)
 {
 	struct dlm_event *dlm_event;
 	struct dlm_event_cl *e;
-	cl_int ret;
 
 	dlm_event = dlm_obj_to_event(obj);
 	e = dlm_extract_event_cl(dlm_event);
 	if (!e)
-		return -EINVAL;
+		return;
 
-	ret = clReleaseEvent(e->clevent);
-	return rc_cl2unix(ret);
+	clReleaseEvent(e->clevent);
 }
 
 static const struct dlm_event_ops event_cl_ops = {
@@ -111,7 +109,8 @@ static const struct dlm_obj_ops event_cl_obj_ops = {
 	.release = event_cl_release,
 };
 
-static struct dlm_event_cl *allocate_event_cl_init(cl_event clevent, bool user)
+static struct dlm_event_cl *
+allocate_event_cl_init(cl_event clevent, bool user, struct dlm_mem_cl *master)
 {
 	struct dlm_event_cl *e;
 	const struct dlm_event_ops *ops;
@@ -120,7 +119,7 @@ static struct dlm_event_cl *allocate_event_cl_init(cl_event clevent, bool user)
 
 	e = (struct dlm_event_cl *)malloc(sizeof(*e));
 	dlm_event_init(&e->event, DLM_MAGIC_EVENT_CL,
-		       ops, &event_cl_obj_ops);
+		       ops, &event_cl_obj_ops, &master->mem.obj);
 
 	e->clevent = clevent;
 	dlm_event_retain(&e->event);
@@ -128,7 +127,8 @@ static struct dlm_event_cl *allocate_event_cl_init(cl_event clevent, bool user)
 	return 0;
 }
 
-struct dlm_event_cl *allocate_event_cl(cl_event clevent)
+struct dlm_event_cl *
+allocate_event_cl(cl_event clevent, struct dlm_mem_cl *mem)
 {
 	cl_int ret;
 	static struct dlm_event_cl *e;
@@ -137,7 +137,7 @@ struct dlm_event_cl *allocate_event_cl(cl_event clevent)
 	if (ret != CL_SUCCESS)
 		return NULL;
 
-	e = allocate_event_cl_init(clevent, false);
+	e = allocate_event_cl_init(clevent, false, mem);
 	if (!e)
 		clReleaseEvent(clevent);
 	return e;
@@ -153,7 +153,7 @@ struct dlm_event_cl *allocate_event_cl_user(struct dlm_mem_cl *mem)
 	if (ret != CL_SUCCESS)
 		return NULL;
 
-	e = allocate_event_cl_init(clevent, false);
+	e = allocate_event_cl_init(clevent, false, mem);
 	if (!e)
 		clReleaseEvent(clevent);
 	return e;

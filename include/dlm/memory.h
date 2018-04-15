@@ -70,20 +70,16 @@ static inline bool dlm_mem_valid(struct dlm_mem *mem)
 	return (mem != NULL) && dlm_obj_is_mem(&mem->obj);
 }
 
-static inline int dlm_mem_retain(struct dlm_mem *mem)
+static inline void dlm_mem_retain(struct dlm_mem *mem)
 {
-	if (!dlm_mem_valid(mem))
-		return -EINVAL;
-
-	return dlm_obj_retain(&mem->obj);
+	if (dlm_mem_valid(mem))
+		dlm_obj_retain(&mem->obj);
 }
 
-static inline int dlm_mem_release(struct dlm_mem *mem)
+static inline void dlm_mem_release(struct dlm_mem *mem)
 {
-	if (!dlm_mem_valid(mem))
-		return -EINVAL;
-
-	return dlm_obj_release(&mem->obj);
+	if (dlm_mem_valid(mem))
+		dlm_obj_release(&mem->obj);
 }
 
 static inline void *dlm_mem_map(struct dlm_mem *mem, enum DLM_MEM_MAP_FLAGS flags)

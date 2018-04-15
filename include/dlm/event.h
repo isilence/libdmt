@@ -50,14 +50,14 @@ static inline bool dlm_event_ready(struct dlm_event *event)
 	return event->ops->ready(event);
 }
 
-static inline int dlm_event_retain(struct dlm_event *event)
+static inline void dlm_event_retain(struct dlm_event *event)
 {
-	return dlm_obj_retain(&event->obj);
+	dlm_obj_retain(&event->obj);
 }
 
-static inline int dlm_event_release(struct dlm_event *event)
+static inline void dlm_event_release(struct dlm_event *event)
 {
-	return dlm_obj_release(&event->obj);
+	dlm_obj_release(&event->obj);
 }
 
 #define dlm_obj_to_event(dlm_obj) container_of((dlm_obj), struct dlm_event, obj)
@@ -74,7 +74,8 @@ struct dlm_event_list {
 	struct dlm_event *events[];
 };
 
-struct dlm_event_list *allocate_event_list(size_t size);
+struct dlm_event_list *allocate_event_list(size_t size,
+					   struct dlm_obj *master);
 void dlm_event_list_wait(struct dlm_event_list *list);
 
 static inline void dlm_event_list_set(struct dlm_event_list *list,
@@ -98,20 +99,16 @@ static inline bool dlm_event_list_valid(struct dlm_event_list *list)
 	return DLM_MAGIC_IS_EVENT(obj->magic);
 }
 
-static inline int dlm_event_list_retain(struct dlm_event_list *list)
+static inline void dlm_event_list_retain(struct dlm_event_list *list)
 {
-	if (!dlm_event_list_valid(list))
-		return -EINVAL;
-
-	return dlm_obj_retain(&list->obj);
+	if (dlm_event_list_valid(list))
+		dlm_obj_retain(&list->obj);
 }
 
-static inline int dlm_event_list_release(struct dlm_event_list *list)
+static inline void dlm_event_list_release(struct dlm_event_list *list)
 {
-	if (!dlm_event_list_valid(list))
-		return -EINVAL;
-
-	return dlm_obj_release(&list->obj);
+	if (dlm_event_list_valid(list))
+		dlm_obj_release(&list->obj);
 }
 
 #define dlm_obj_to_event_list(dlm_obj) \

@@ -29,6 +29,7 @@ int main(void)
 		cmocka_unit_test_setup(test_object_destruction, test_vms_setup),
 		vms_obj_test(test_mem_map),
 		cmocka_unit_test_setup_teardown(test_copy, test_vms_pair_setup, test_vms_pair_teardown),
+		cmocka_unit_test(test_object_root),
 	};
 
 	return cmocka_run_group_tests(tests, NULL, NULL);
