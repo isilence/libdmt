@@ -26,16 +26,9 @@ set(SOURCE_FILES
         # dlm
         ${DIR_INC}/dlm/object.h
         ${DIR_INC}/dlm/memory.h
-        ${DIR_INC}/dlm/event.h
         common.h
         generic.c
         object.c
-
-        events/common.c
-        ${DIR_INC}/dlm/events/latch.h
-        events/latch.c
-        ${DIR_INC}/dlm/events/seq.h
-        events/seq.c
 
         # virtual memory storage
         ${DIR_INC}/dlm/providers/vms.h
@@ -43,9 +36,7 @@ set(SOURCE_FILES
 
         # opencl devices
         ${DIR_INC}/dlm/providers/opencl.h
-        providers/cl/mem.c
-        providers/cl/cl_event.h
-        providers/cl/cl_event.c
+        providers/opencl.c
 
         # infiniband verbs devices
         ${DIR_INC}/dlm/providers/ib.h

@@ -1,14 +1,37 @@
 #include <stdlib.h>
 #include <dlm/providers/opencl.h>
 #include <dlm/providers/vms.h>
-#include <dlm/events/seq.h>
 
 #include <string.h>
 
 #include "common.h"
-#include "cl_event.h"
 
 #define dlm_obj_to_cl(dlm_obj) dlm_mem_to_cl(dlm_obj_to_mem((dlm_obj)))
+
+static int rc_cl2unix(cl_int err)
+{
+	int ret;
+
+	switch (err) {
+		case CL_SUCCESS:
+			ret = 0;
+			break;
+		case CL_OUT_OF_HOST_MEMORY:
+			ret = -ENOMEM;
+			break;
+		case CL_OUT_OF_RESOURCES:
+			ret = -ENOSPC;
+			break;
+		case CL_MEM_OBJECT_ALLOCATION_FAILURE:
+			ret = -EFAULT;
+			break;
+			/* case CL_MAP_FAILURE: */
+		default:
+			ret = -EINVAL;
+	}
+
+	return ret;
+}
 
 static inline bool is_cl_mem(struct dlm_mem *mem)
 {
@@ -119,16 +142,10 @@ exit_foo:
 }
 
 static int cl_copy(struct dlm_mem * restrict src,
-		   struct dlm_mem * restrict dst,
-		   struct dlm_sync *sync)
+		   struct dlm_mem * restrict dst)
 {
-	struct dlm_event_seq *event;
 	struct dlm_mem_cl *mem = dlm_mem_to_cl(src);
 	int ret;
-
-	ret = dlm_event_list_wait(sync->waitfor);
-	if (!ret)
-		return ret;
 
 	ret = cl_try_copy_cl2cl(mem, dst);
 	if (ret != -ENOSYS)
@@ -140,13 +157,6 @@ static int cl_copy(struct dlm_mem * restrict src,
 
 	ret = -ENOSYS;
 finalise:
-	if (!ret && sync->sync) {
-		event = dlm_event_seq_create(&mem->mem.obj);
-		if (event)
-			sync->event = &event->event;
-		else
-			ret = -EFAULT;
-	}
 	return ret;
 }
 

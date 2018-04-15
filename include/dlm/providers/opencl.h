@@ -2,7 +2,6 @@
 #define DLM_OPENCL_MEMORY_H__
 
 #include <dlm/memory.h>
-#include <dlm/event.h>
 #ifdef __APPLE__
 	#include <OpenCL/opencl.h>
 	#include <OpenCL/cl_ext.h>

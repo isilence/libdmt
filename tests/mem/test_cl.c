@@ -1,6 +1,5 @@
 #include <dlm/memory.h>
 #include <dlm/providers/opencl.h>
-#include <dlm/events/seq.h>
 
 #include "../test_base.h"
 #include "test_mem.h"
