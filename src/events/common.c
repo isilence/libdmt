@@ -6,7 +6,11 @@
 static void wait_list_release(struct dlm_obj *obj)
 {
 	struct dlm_event_list *event = dlm_obj_to_event_list(obj);
+	size_t i;
 
+	for (i = 0; i < event->size; i += 1)
+		if (event->events[i])
+			dlm_event_release(event->events[i]);
 	free(event);
 }
 
@@ -28,15 +32,26 @@ struct dlm_event_list *allocate_event_list(size_t n, struct dlm_obj *master)
 	dlm_obj_init(&list->obj, master);
 	dlm_obj_set_ops(&list->obj, &obj_ops);
 	list->obj.magic = DLM_MAGIC_EVENT_LIST;
+	list->size = n;
+	dlm_obj_retain(&list->obj);
 
 	return list;
 }
 
-void dlm_event_list_wait(struct dlm_event_list *list)
+int dlm_event_list_wait(struct dlm_event_list *list)
 {
+	int ret;
 	size_t i;
+	struct dlm_event *e;
 
-	for (i = 0; i < list->size; i += 1)
-		if (list->events[i])
-			dlm_event_wait(list->events[i], DLM_EVENT_INFINITY);
+	for (i = 0; i < list->size; i += 1) {
+		e = list->events[i];
+		if (!e)
+			continue;
+
+		ret = dlm_event_wait(e, DLM_EVENT_INFINITY);
+		if (ret)
+			return ret;
+	}
+	return 0;
 }

@@ -93,16 +93,57 @@ static void event_cl_release(struct dlm_obj *obj)
 	clReleaseEvent(e->clevent);
 }
 
+struct pair {
+	struct dlm_event *event;
+	event_callback clb;
+};
+
+static void CL_CALLBACK cl_eclb(cl_event e, cl_int st, void *data)
+{
+	struct pair *pair = (struct pair *)data;
+
+	if (st == CL_SUCCESS)
+		pair->clb(pair->event, data);
+	free(pair);
+}
+
+int event_cl_reg_clb(struct dlm_event *event, event_callback clb, void *data)
+{
+	struct dlm_event_cl *e;
+	struct pair *pair;
+	cl_int ret;
+
+	e = dlm_extract_event_cl(event);
+	if (!e)
+		return -EINVAL;
+
+	pair = malloc(sizeof(*pair));
+	if (!pair)
+		return -ENOMEM;
+
+	pair->clb = clb;
+	pair->event = event;
+
+	ret = clSetEventCallback(e->clevent, CL_COMPLETE,
+				 cl_eclb, (void *)pair);
+	if (!ret)
+		free(pair);
+
+	return rc_cl2unix(ret);
+}
+
 static const struct dlm_event_ops event_cl_ops = {
 	.wait = event_cl_wait,
 	.signal = event_cl_signal,
 	.ready = event_cl_ready,
+	.reg_clb = event_cl_reg_clb,
 };
 
 static const struct dlm_event_ops event_cl_ops_user = {
 	.wait = event_cl_wait,
 	.signal = event_cl_signal_user,
 	.ready = event_cl_ready,
+	.reg_clb = event_cl_reg_clb,
 };
 
 static const struct dlm_obj_ops event_cl_obj_ops = {

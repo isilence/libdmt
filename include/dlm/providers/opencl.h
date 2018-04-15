@@ -45,13 +45,4 @@ struct dlm_mem *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
 				   struct dlm_mem *master,
 				   cl_mem_flags flags);
 
-struct dlm_event_cl {
-	struct dlm_event event;
-
-	cl_event clevent;
-	bool ready;
-};
-
-#define dlm_event_to_cl(e) container_of((e), struct dlm_event_cl, event)
-
 #endif /* DLM_OPENCL_MEMORY_H__ */

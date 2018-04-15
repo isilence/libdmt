@@ -3,6 +3,7 @@
 
 #include <env/dlm/compiler.h>
 #include <dlm/object.h>
+#include "event.h"
 
 /* memory */
 
@@ -39,7 +40,8 @@ struct dlm_mem_ops {
 	void * (*map) (struct dlm_mem *, enum DLM_MEM_MAP_FLAGS flags);
 	int (*unmap) (struct dlm_mem *, void *va);
 	int (*copy) (	struct dlm_mem * restrict src,
-			struct dlm_mem * restrict dst);
+			struct dlm_mem * restrict dst,
+			struct dlm_sync *sync);
 };
 
 struct dlm_mem {
@@ -99,14 +101,32 @@ static inline int dlm_mem_unmap(struct dlm_mem *mem, void *va)
 }
 
 static inline int dlm_mem_copy(struct dlm_mem *src,
-			       struct dlm_mem *dst)
+			       struct dlm_mem *dst,
+			       struct dlm_sync *sync)
 {
+	int ret;
+	struct dlm_sync synccp = {
+		.waitfor = NULL,
+		.sync = false,
+	};
+
+	if (!sync)
+		sync = &synccp;
+
 	if (!dlm_mem_valid(src) || !dlm_mem_valid(dst) || src == dst)
 		return -EINVAL;
 	if (!dlm_mem_copy_size_valid(src, dst))
 		return -ENOSPC;
 
-	return src->ops->copy(src, dst);
+	if (sync->waitfor)
+		dlm_obj_retain(&sync->waitfor->obj);
+
+	ret = src->ops->copy(src, dst, sync);
+
+	if (sync->waitfor)
+		dlm_obj_release(&sync->waitfor->obj);
+
+	return ret;
 }
 
 #define dlm_mem_to_dlm(memobj, type, magic) container_of((memobj), type, mem)

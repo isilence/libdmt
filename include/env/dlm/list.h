@@ -10,7 +10,8 @@ struct list_head {
     list_head_t *next, *prev;
 };
 
-
+#define WRITE_ONCE(x, y) x = (y)
+#define READ_ONCE(x) (x)
 /*
  * Simple doubly linked list implementation.
  *
@@ -20,74 +21,80 @@ struct list_head {
  * generate better code by using them directly rather than
  * using the generic single-entry routines.
  */
+
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
 
 #define LIST_HEAD(name) \
-    list_head_t name = LIST_HEAD_INIT(name)
+	struct list_head name = LIST_HEAD_INIT(name)
 
-static inline void INIT_LIST_HEAD(list_head_t *list)
+static inline void INIT_LIST_HEAD(struct list_head *list)
 {
-    list->next, list;
-    list->prev = list;
+	WRITE_ONCE(list->next, list);
+	list->prev = list;
 }
 
-
-static inline bool __list_add_valid(list_head_t *new_node,
-                                    list_head_t *prev,
-                                    list_head_t *next)
+#ifdef CONFIG_DEBUG_LIST
+extern bool __list_add_valid(struct list_head *new,
+			      struct list_head *prev,
+			      struct list_head *next);
+extern bool __list_del_entry_valid(struct list_head *entry);
+#else
+static inline bool __list_add_valid(struct list_head *new,
+				    struct list_head *prev,
+				    struct list_head *next)
 {
-    return true;
+	return true;
 }
-static inline bool __list_del_entry_valid(list_head_t *entry)
+static inline bool __list_del_entry_valid(struct list_head *entry)
 {
-    return true;
+	return true;
 }
-
+#endif
 
 /*
- * Insert a new_node entry between two known consecutive entries.
+ * Insert a new entry between two known consecutive entries.
  *
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static inline void __list_add(list_head_t *new_node,
-                              list_head_t *prev,
-                              list_head_t *next)
+static inline void __list_add(struct list_head *new,
+			      struct list_head *prev,
+			      struct list_head *next)
 {
-    if (!__list_add_valid(new_node, prev, next))
-        return;
+	if (!__list_add_valid(new, prev, next))
+		return;
 
-    next->prev = new_node;
-    new_node->next = next;
-    new_node->prev = prev;
-    prev->next = new_node;
+	next->prev = new;
+	new->next = next;
+	new->prev = prev;
+	WRITE_ONCE(prev->next, new);
 }
 
 /**
- * list_add - add a new_node entry
- * @new_node: new_node entry to be added
+ * list_add - add a new entry
+ * @new: new entry to be added
  * @head: list head to add it after
  *
- * Insert a new_node entry after the specified head.
+ * Insert a new entry after the specified head.
  * This is good for implementing stacks.
  */
-static inline void list_add(list_head_t *new_node, list_head_t *head)
+static inline void list_add(struct list_head *new, struct list_head *head)
 {
-    __list_add(new_node, head, head->next);
+	__list_add(new, head, head->next);
 }
 
 
 /**
- * list_add_tail - add a new_node entry
- * @new_node: new_node entry to be added
+ * list_add_tail - add a new entry
+ * @new: new entry to be added
  * @head: list head to add it before
  *
- * Insert a new_node entry before the specified head.
+ * Insert a new entry before the specified head.
  * This is useful for implementing queues.
  */
-static inline void list_add_tail(list_head_t *new_node, list_head_t *head)
+static inline void list_add_tail(struct list_head *new, struct list_head *head)
 {
-    __list_add(new_node, head->prev, head);
+	__list_add(new, head->prev, head);
 }
 
 /*
@@ -97,10 +104,10 @@ static inline void list_add_tail(list_head_t *new_node, list_head_t *head)
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static inline void __list_del(list_head_t *prev, list_head_t *next)
+static inline void __list_del(struct list_head * prev, struct list_head * next)
 {
-    next->prev = prev;
-    prev->next = next;
+	next->prev = prev;
+	WRITE_ONCE(prev->next, next);
 }
 
 /**
@@ -109,52 +116,52 @@ static inline void __list_del(list_head_t *prev, list_head_t *next)
  * Note: list_empty() on entry does not return true after this, the entry is
  * in an undefined state.
  */
-static inline void __list_del_entry(list_head_t *entry)
+static inline void __list_del_entry(struct list_head *entry)
 {
-    if (!__list_del_entry_valid(entry))
-        return;
+	if (!__list_del_entry_valid(entry))
+		return;
 
-    __list_del(entry->prev, entry->next);
+	__list_del(entry->prev, entry->next);
 }
 
-static inline void list_del(list_head_t *entry)
+static inline void list_del(struct list_head *entry)
 {
-    __list_del_entry(entry);
-    entry->next = LIST_POISON1;
-    entry->prev = LIST_POISON2;
+	__list_del_entry(entry);
+	entry->next = LIST_POISON1;
+	entry->prev = LIST_POISON2;
 }
 
 /**
  * list_replace - replace old entry by new one
  * @old : the element to be replaced
- * @new_node : the new element to insert
+ * @new : the new element to insert
  *
  * If @old was empty, it will be overwritten.
  */
-static inline void list_replace(list_head_t *old,
-                                list_head_t *new_node)
+static inline void list_replace(struct list_head *old,
+				struct list_head *new)
 {
-    new_node->next = old->next;
-    new_node->next->prev = new_node;
-    new_node->prev = old->prev;
-    new_node->prev->next = new_node;
+	new->next = old->next;
+	new->next->prev = new;
+	new->prev = old->prev;
+	new->prev->next = new;
 }
 
-static inline void list_replace_init(list_head_t *old,
-                                     list_head_t *new_node)
+static inline void list_replace_init(struct list_head *old,
+				     struct list_head *new)
 {
-    list_replace(old, new_node);
-    INIT_LIST_HEAD(old);
+	list_replace(old, new);
+	INIT_LIST_HEAD(old);
 }
 
 /**
  * list_del_init - deletes entry from list and reinitialize it.
  * @entry: the element to delete from the list.
  */
-static inline void list_del_init(list_head_t *entry)
+static inline void list_del_init(struct list_head *entry)
 {
-    __list_del_entry(entry);
-    INIT_LIST_HEAD(entry);
+	__list_del_entry(entry);
+	INIT_LIST_HEAD(entry);
 }
 
 /**
@@ -162,10 +169,10 @@ static inline void list_del_init(list_head_t *entry)
  * @list: the entry to move
  * @head: the head that will precede our entry
  */
-static inline void list_move(list_head_t *list, list_head_t *head)
+static inline void list_move(struct list_head *list, struct list_head *head)
 {
-    __list_del_entry(list);
-    list_add(list, head);
+	__list_del_entry(list);
+	list_add(list, head);
 }
 
 /**
@@ -173,11 +180,11 @@ static inline void list_move(list_head_t *list, list_head_t *head)
  * @list: the entry to move
  * @head: the head that will follow our entry
  */
-static inline void list_move_tail(list_head_t *list,
-                                  list_head_t *head)
+static inline void list_move_tail(struct list_head *list,
+				  struct list_head *head)
 {
-    __list_del_entry(list);
-    list_add_tail(list, head);
+	__list_del_entry(list);
+	list_add_tail(list, head);
 }
 
 /**
@@ -185,19 +192,19 @@ static inline void list_move_tail(list_head_t *list,
  * @list: the entry to test
  * @head: the head of the list
  */
-static inline int list_is_last(const list_head_t *list,
-                               const list_head_t *head)
+static inline int list_is_last(const struct list_head *list,
+			       const struct list_head *head)
 {
-    return list->next == head;
+	return list->next == head;
 }
 
 /**
  * list_empty - tests whether a list is empty
  * @head: the list to test.
  */
-static inline int list_empty(const list_head_t *head)
+static inline int list_empty(const struct list_head *head)
 {
-    return head->next == head;
+	return READ_ONCE(head->next) == head;
 }
 
 /**
@@ -213,45 +220,45 @@ static inline int list_empty(const list_head_t *head)
  * to the list entry is list_del_init(). Eg. it cannot be used
  * if another CPU could re-list_add() it.
  */
-static inline int list_empty_careful(const list_head_t *head)
+static inline int list_empty_careful(const struct list_head *head)
 {
-    list_head_t *next = head->next;
-    return (next == head) && (next == head->prev);
+	struct list_head *next = head->next;
+	return (next == head) && (next == head->prev);
 }
 
 /**
  * list_rotate_left - rotate the list to the left
  * @head: the head of the list
  */
-static inline void list_rotate_left(list_head_t *head)
+static inline void list_rotate_left(struct list_head *head)
 {
-    list_head_t *first;
+	struct list_head *first;
 
-    if (!list_empty(head)) {
-        first = head->next;
-        list_move_tail(first, head);
-    }
+	if (!list_empty(head)) {
+		first = head->next;
+		list_move_tail(first, head);
+	}
 }
 
 /**
  * list_is_singular - tests whether a list has just one entry.
  * @head: the list to test.
  */
-static inline int list_is_singular(const list_head_t *head)
+static inline int list_is_singular(const struct list_head *head)
 {
-    return !list_empty(head) && (head->next == head->prev);
+	return !list_empty(head) && (head->next == head->prev);
 }
 
-static inline void __list_cut_position(list_head_t *list,
-                                       list_head_t *head, list_head_t *entry)
+static inline void __list_cut_position(struct list_head *list,
+				       struct list_head *head, struct list_head *entry)
 {
-    list_head_t *new_first = entry->next;
-    list->next = head->next;
-    list->next->prev = list;
-    list->prev = entry;
-    entry->next = list;
-    head->next = new_first;
-    new_first->prev = head;
+	struct list_head *new_first = entry->next;
+	list->next = head->next;
+	list->next->prev = list;
+	list->prev = entry;
+	entry->next = list;
+	head->next = new_first;
+	new_first->prev = head;
 }
 
 /**
@@ -268,32 +275,32 @@ static inline void __list_cut_position(list_head_t *list,
  * losing its data.
  *
  */
-static inline void list_cut_position(list_head_t *list,
-                                     list_head_t *head, list_head_t *entry)
+static inline void list_cut_position(struct list_head *list,
+				     struct list_head *head, struct list_head *entry)
 {
-    if (list_empty(head))
-        return;
-    if (list_is_singular(head) &&
-        (head->next != entry && head != entry))
-        return;
-    if (entry == head)
-        INIT_LIST_HEAD(list);
-    else
-        __list_cut_position(list, head, entry);
+	if (list_empty(head))
+		return;
+	if (list_is_singular(head) &&
+	    (head->next != entry && head != entry))
+		return;
+	if (entry == head)
+		INIT_LIST_HEAD(list);
+	else
+		__list_cut_position(list, head, entry);
 }
 
-static inline void __list_splice(const list_head_t *list,
-                                 list_head_t *prev,
-                                 list_head_t *next)
+static inline void __list_splice(const struct list_head *list,
+				 struct list_head *prev,
+				 struct list_head *next)
 {
-    list_head_t *first = list->next;
-    list_head_t *last = list->prev;
+	struct list_head *first = list->next;
+	struct list_head *last = list->prev;
 
-    first->prev = prev;
-    prev->next = first;
+	first->prev = prev;
+	prev->next = first;
 
-    last->next = next;
-    next->prev = last;
+	last->next = next;
+	next->prev = last;
 }
 
 /**
@@ -301,11 +308,11 @@ static inline void __list_splice(const list_head_t *list,
  * @list: the new list to add.
  * @head: the place to add it in the first list.
  */
-static inline void list_splice(const list_head_t *list,
-                               list_head_t *head)
+static inline void list_splice(const struct list_head *list,
+			       struct list_head *head)
 {
-    if (!list_empty(list))
-        __list_splice(list, head, head->next);
+	if (!list_empty(list))
+		__list_splice(list, head, head->next);
 }
 
 /**
@@ -313,11 +320,11 @@ static inline void list_splice(const list_head_t *list,
  * @list: the new list to add.
  * @head: the place to add it in the first list.
  */
-static inline void list_splice_tail(list_head_t *list,
-                                    list_head_t *head)
+static inline void list_splice_tail(struct list_head *list,
+				    struct list_head *head)
 {
-    if (!list_empty(list))
-        __list_splice(list, head->prev, head);
+	if (!list_empty(list))
+		__list_splice(list, head->prev, head);
 }
 
 /**
@@ -327,13 +334,13 @@ static inline void list_splice_tail(list_head_t *list,
  *
  * The list at @list is reinitialised
  */
-static inline void list_splice_init(list_head_t *list,
-                                    list_head_t *head)
+static inline void list_splice_init(struct list_head *list,
+				    struct list_head *head)
 {
-    if (!list_empty(list)) {
-        __list_splice(list, head, head->next);
-        INIT_LIST_HEAD(list);
-    }
+	if (!list_empty(list)) {
+		__list_splice(list, head, head->next);
+		INIT_LIST_HEAD(list);
+	}
 }
 
 /**
@@ -344,13 +351,13 @@ static inline void list_splice_init(list_head_t *list,
  * Each of the lists is a queue.
  * The list at @list is reinitialised
  */
-static inline void list_splice_tail_init(list_head_t *list,
-                                         list_head_t *head)
+static inline void list_splice_tail_init(struct list_head *list,
+					 struct list_head *head)
 {
-    if (!list_empty(list)) {
-        __list_splice(list, head->prev, head);
-        INIT_LIST_HEAD(list);
-    }
+	if (!list_empty(list)) {
+		__list_splice(list, head->prev, head);
+		INIT_LIST_HEAD(list);
+	}
 }
 
 /**
@@ -424,7 +431,7 @@ static inline void list_splice_tail_init(list_head_t *list,
 
 /**
  * list_for_each_prev	-	iterate over a list backwards
- * @pos:	the &list_head_t to use as a loop cursor.
+ * @pos:	the &struct list_head to use as a loop cursor.
  * @head:	the head for your list.
  */
 #define list_for_each_prev(pos, head) \
@@ -611,6 +618,5 @@ static inline void list_splice_tail_init(list_head_t *list,
  */
 #define list_safe_reset_next(pos, n, member)				\
 	n = list_next_entry(pos, member)
-
 
 #endif /* DLM_LIST_H__ */

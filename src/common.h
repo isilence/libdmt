@@ -5,7 +5,8 @@
 #include <dlm/event.h>
 
 int dlm_mem_generic_copy(struct dlm_mem * restrict src,
-			 struct dlm_mem * restrict dst);
+			 struct dlm_mem * restrict dst,
+			 struct dlm_sync *sync);
 
 void dlm_mem_init(struct dlm_mem *mem,
 		  size_t size,

@@ -84,7 +84,7 @@ static inline void test_copy(void **state)
 
 	assert_return_code(dlm_mem_unmap(src, src_va), 0);
 	assert_return_code(dlm_mem_unmap(dst, dst_va), 0);
-	assert_return_code(dlm_mem_copy(src, dst), 0);
+	assert_return_code(dlm_mem_copy(src, dst, NULL), 0);
 
 	assert_non_null((src_va = dlm_mem_map(src, DLM_MAP_READ)));
 	assert_non_null((dst_va = dlm_mem_map(dst, DLM_MAP_READ)));

@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <dlm/providers/opencl.h>
 #include <dlm/providers/vms.h>
+#include <dlm/events/seq.h>
+
 #include <string.h>
 
 #include "common.h"
@@ -117,16 +119,35 @@ exit_foo:
 }
 
 static int cl_copy(struct dlm_mem * restrict src,
-		   struct dlm_mem * restrict dst)
+		   struct dlm_mem * restrict dst,
+		   struct dlm_sync *sync)
 {
+	struct dlm_event_seq *event;
 	struct dlm_mem_cl *mem = dlm_mem_to_cl(src);
 	int ret;
 
-	ret = cl_try_copy_cl2cl(mem, dst);
-	if (ret != -ENOSYS)
+	ret = dlm_event_list_wait(sync->waitfor);
+	if (!ret)
 		return ret;
 
-	return cl_copy_generic(mem, dst);
+	ret = cl_try_copy_cl2cl(mem, dst);
+	if (ret != -ENOSYS)
+		goto finalise;
+
+	ret = cl_copy_generic(mem, dst);
+	if (ret != -ENOSYS)
+		goto finalise;
+
+	ret = -ENOSYS;
+finalise:
+	if (!ret && sync->sync) {
+		event = dlm_event_seq_create(&mem->mem.obj);
+		if (event)
+			sync->event = &event->event;
+		else
+			ret = -EFAULT;
+	}
+	return ret;
 }
 
 static cl_int cl_release_cl_mem(struct dlm_mem_cl *mem)

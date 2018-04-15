@@ -17,6 +17,7 @@
 
 #define DLM_MAGIC_EVENT_SEQ		DLM_MAGIC_MEM_CREATE(11)
 #define DLM_MAGIC_EVENT_LATCH		DLM_MAGIC_MEM_CREATE(22)
+#define DLM_MAGIC_EVENT_LATCH_CLB	DLM_MAGIC_MEM_CREATE(23)
 #define DLM_MAGIC_EVENT_CL		DLM_MAGIC_MEM_CREATE(33)
 #define DLM_MAGIC_EVENT_LIST		DLM_MAGIC_MEM_CREATE(666)
 
@@ -24,10 +25,13 @@
  *		event
  */
 
+typedef void (*event_callback)(struct dlm_event *, void *data);
+
 struct dlm_event_ops {
 	int	(*wait)(struct dlm_event *, u32 ms);
 	int	(*signal)(struct dlm_event *);
 	bool	(*ready)(struct dlm_event *);
+	int	(*reg_clb)(struct dlm_event *, event_callback, void *data);
 };
 
 struct dlm_event {
@@ -50,6 +54,12 @@ static inline bool dlm_event_ready(struct dlm_event *event)
 	return event->ops->ready(event);
 }
 
+static inline int dlm_event_reg_clb(struct dlm_event *event,
+				    event_callback clb, void *data)
+{
+	return event->ops->reg_clb(event, clb, data);
+}
+
 static inline void dlm_event_retain(struct dlm_event *event)
 {
 	dlm_obj_retain(&event->obj);
@@ -63,7 +73,7 @@ static inline void dlm_event_release(struct dlm_event *event)
 #define dlm_obj_to_event(dlm_obj) container_of((dlm_obj), struct dlm_event, obj)
 
 
-/* 	==================================================
+/*	==================================================
  *		event list
  */
 
@@ -76,16 +86,23 @@ struct dlm_event_list {
 
 struct dlm_event_list *allocate_event_list(size_t size,
 					   struct dlm_obj *master);
-void dlm_event_list_wait(struct dlm_event_list *list);
+int dlm_event_list_wait(struct dlm_event_list *list);
 
 static inline void dlm_event_list_set(struct dlm_event_list *list,
 				      struct dlm_event *event,
 				      size_t num)
 {
+	struct dlm_event *old;
+
 	if (num >= list->size)
 		return;
 
-	list->events[0] = event;
+	old = list->events[num];
+	if (old)
+		dlm_event_release(old);
+	if (event)
+		dlm_event_retain(event);
+	list->events[num] = event;
 }
 
 static inline bool dlm_event_list_valid(struct dlm_event_list *list)

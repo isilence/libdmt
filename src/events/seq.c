@@ -37,6 +37,13 @@ static int seq_wait(struct dlm_event *dlm_event, u32 ms)
 	return 0;
 }
 
+int seq_reg_clb(struct dlm_event *e, event_callback clb, void *data)
+{
+	clb(e, data);
+
+	return 0;
+}
+
 static const struct dlm_obj_ops seq_obj_ops = {
 	.release = seq_release,
 };
@@ -45,6 +52,7 @@ static const struct dlm_event_ops seq_event_ops = {
 	.wait = seq_wait,
 	.signal = seq_fire,
 	.ready = seq_ready,
+	.reg_clb = seq_reg_clb,
 };
 
 struct dlm_event_seq *dlm_event_seq_create(struct dlm_obj *master)

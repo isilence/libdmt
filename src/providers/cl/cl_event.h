@@ -4,6 +4,15 @@
 #include <dlm/event.h>
 #include <dlm/providers/opencl.h>
 
+struct dlm_event_cl {
+    struct dlm_event event;
+
+    cl_event clevent;
+    bool ready;
+};
+
+#define dlm_event_to_cl(e) container_of((e), struct dlm_event_cl, event)
+
 static inline
 struct dlm_event_cl *dlm_extract_event_cl(struct dlm_event *event)
 {
