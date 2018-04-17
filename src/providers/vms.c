@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include <dlm/providers/vms.h>
-#include <dlm/providers/memview1.h>
 
 #include "generic.h"
 

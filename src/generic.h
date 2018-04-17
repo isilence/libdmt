@@ -25,4 +25,12 @@ int dlm_mem_copy_back(struct dlm_mem * restrict src,
 		      struct dlm_mem * restrict dst,
 		      enum DLM_COPY_DIR forward);
 
+struct dlm_mem** dlm_mem_create_pair(struct dlm_mem *m1,
+					struct dlm_mem *m2);
+
+struct dlm_mem** dlm_mem_create_pair_locked(struct dlm_mem *m1,
+					    struct dlm_mem *m2);
+
+int dlm_mem_pair_free(struct dlm_mem **pair);
+
 #endif /* DLM_MEMORY_OPERATIONS_H__ */

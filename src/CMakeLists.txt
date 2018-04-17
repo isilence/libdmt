@@ -32,9 +32,13 @@ set(SOURCE_FILES
         # virtual memory storage
         ${DIR_INC}/dlm/providers/vms.h
         providers/vms.c
+
         # opencl devices
         ${DIR_INC}/dlm/providers/opencl.h
-        providers/opencl.c
+        providers/opencl/dlm_opencl.h
+        providers/opencl/copy.c
+        providers/opencl/memory.c
+
         # infiniband verbs devices
         ${DIR_INC}/dlm/providers/ib.h
         providers/ib.c
