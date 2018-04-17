@@ -43,4 +43,7 @@ struct dlm_mem_cl *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
 				      struct dlm_mem *master,
 				      cl_mem_flags flags);
 
+void *dlm_mem_cl_map(struct dlm_mem_cl *mem, int flags);
+int dlm_mem_cl_unmap(struct dlm_mem_cl *mem, void *ptr);
+
 #endif /* DLM_OPENCL_MEMORY_H__ */

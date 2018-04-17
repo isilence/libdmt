@@ -137,6 +137,6 @@ int dlm_mem_cl_copy(struct dlm_mem * restrict src,
 		goto finalise;
 
 	ret = -ENOSYS;
-	finalise:
+finalise:
 	return ret;
 }

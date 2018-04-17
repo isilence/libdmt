@@ -38,6 +38,7 @@ set(SOURCE_FILES
         providers/opencl/dlm_opencl.h
         providers/opencl/copy.c
         providers/opencl/memory.c
+        providers/opencl/map.c
 
         # infiniband verbs devices
         ${DIR_INC}/dlm/providers/ib.h
