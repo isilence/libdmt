@@ -56,6 +56,7 @@ static int test_opencl_setup(void **state)
 		.device = device,
 		.context = context,
 		.queue = queue,
+		.platform = platform,
 	};
 
 	mem = dlm_cl_allocate_memory(&ctx, MEM_TEST_SIZE, CL_MEM_READ_WRITE);

@@ -36,6 +36,7 @@ enum DLM_COPY_DIR {
 struct dlm_mem_ops {
 	int (*copy) (	struct dlm_mem * restrict src,
 			struct dlm_mem * restrict dst,
+			size_t size,
 			enum DLM_COPY_DIR dir);
 };
 
@@ -81,18 +82,35 @@ static inline void dlm_mem_release(struct dlm_mem *mem)
 		dlm_obj_release(&mem->obj);
 }
 
+/* internal */
+static inline int dlm_mem_copysz(struct dlm_mem *src,
+				 struct dlm_mem *dst,
+				 size_t size)
+{
+	int ret;
+
+	dst->err = 0;
+	src->err = 0;
+
+	ret = src->ops->copy(src, dst, size, DLM_COPY_FORWARD);
+
+	if (ret && ret == -ENOSYS)
+		ret = dst->ops->copy(dst, src, size, DLM_COPY_BACKWARD);
+
+	return ret;
+}
+
 static inline int dlm_mem_copy(struct dlm_mem *src,
 			       struct dlm_mem *dst)
 {
+	size_t size = src->size;
+
 	if (!dlm_mem_valid(src) || !dlm_mem_valid(dst) || src == dst)
 		return -EINVAL;
 	if (!dlm_mem_copy_size_valid(src, dst))
 		return -ENOSPC;
 
-	dst->err = 0;
-	src->err = 0;
-
-	return src->ops->copy(src, dst, DLM_COPY_FORWARD);
+	return dlm_mem_copysz(src, dst, size);
 }
 
 #define dlm_mem_to_dlm(memobj, type, magic) container_of((memobj), type, mem)

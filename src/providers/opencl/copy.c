@@ -20,11 +20,6 @@ typedef CL_API_ENTRY cl_int CL_API_CALL
 		     const cl_event *   /* event_wait_list */,
 		     cl_event *         /* event */);
 
-static inline bool is_cl_mem(struct dlm_mem *mem)
-{
-	return dlm_mem_get_magic(mem) == DLM_MAGIC_MEM_OPENCL;
-}
-
 static void CL_CALLBACK copy_clb(cl_event event, cl_int rc, void *data)
 {
 	struct dlm_mem **ms = (struct dlm_mem **)data;
@@ -41,7 +36,8 @@ static void CL_CALLBACK copy_clb(cl_event event, cl_int rc, void *data)
 }
 
 static int cl_try_copy_cl2cl(struct dlm_mem_cl *restrict src,
-			     struct dlm_mem *restrict dlm_dst)
+			     struct dlm_mem *restrict dlm_dst,
+			     size_t size)
 {
 	cl_int err = CL_INVALID_VALUE;
 	cl_event event;
@@ -60,7 +56,7 @@ static int cl_try_copy_cl2cl(struct dlm_mem_cl *restrict src,
 		goto error;
 
 	err = clEnqueueCopyBuffer(src->queue, src->clmem, dst->clmem,
-				  0, 0, src->mem.size,
+				  0, 0, size,
 				  0, NULL, &event);
 	if (err != CL_SUCCESS)
 		goto error;
@@ -81,6 +77,7 @@ error:
 
 static int cl_try_copy_cl_vms(struct dlm_mem_cl *restrict cl,
 			      struct dlm_mem *restrict dlm_mem,
+			      size_t size,
 			      enum DLM_COPY_DIR dir)
 {
 	cl_int err = CL_INVALID_VALUE;
@@ -100,7 +97,7 @@ static int cl_try_copy_cl_vms(struct dlm_mem_cl *restrict cl,
 	foo = (clEnqueueBuffer_t)((dir == DLM_COPY_FORWARD)
 		? (clEnqueueBuffer_t)clEnqueueReadBuffer: clEnqueueWriteBuffer);
 	err = foo(cl->queue, cl->clmem, CL_FALSE,
-		  0, cl->mem.size, vms->va,
+		  0, size, vms->va,
 		  0, NULL, &event);
 	if (err != CL_SUCCESS)
 		goto error;
@@ -119,6 +116,7 @@ error:
 
 int dlm_mem_cl_copy(struct dlm_mem * restrict src,
 		    struct dlm_mem * restrict dst,
+		    size_t size,
 		    enum DLM_COPY_DIR dir)
 {
 	struct dlm_mem_cl *mem;
@@ -128,11 +126,11 @@ int dlm_mem_cl_copy(struct dlm_mem * restrict src,
 		return -EINVAL;
 	mem = dlm_mem_to_cl(src);
 
-	ret = cl_try_copy_cl2cl(mem, dst);
+	ret = cl_try_copy_cl2cl(mem, dst, size);
 	if (ret != -ENOSYS)
 		goto finalise;
 
-	ret = cl_try_copy_cl_vms(mem, dst, dir);
+	ret = cl_try_copy_cl_vms(mem, dst, size, dir);
 	if (ret != -ENOSYS)
 		goto finalise;
 

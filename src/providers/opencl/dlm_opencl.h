@@ -8,6 +8,7 @@ int dlm_rc_cl2unix(cl_int err);
 
 int dlm_mem_cl_copy(struct dlm_mem * restrict src,
 		    struct dlm_mem * restrict dst,
+		    size_t size,
 		    enum DLM_COPY_DIR dir);
 
 #endif /* DLM_INTERNAL_PROVIDER_OPENCL_H__ */

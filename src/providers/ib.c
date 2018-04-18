@@ -26,15 +26,22 @@ static void ib_release(struct dlm_obj *dlm_obj)
 
 static int ib_copy(struct dlm_mem * restrict src,
 		   struct dlm_mem * restrict dst,
+		   size_t size,
 		   enum DLM_COPY_DIR dir)
 {
 	struct dlm_mem_ib *ib;
+	int ret;
 
 	if (!is_ib_mem(src))
 		return -EINVAL;
 	ib = dlm_mem_to_ib(src);
 
-	return src->ops->copy(ib->vms, dst, dir);
+	if (dir == DLM_COPY_FORWARD)
+		ret = dlm_mem_copysz(ib->vms, dst, size);
+	else
+		ret = dlm_mem_copysz(dst, ib->vms, size);
+
+	return ret;
 }
 
 static const struct dlm_obj_ops ib_obj_ops = {

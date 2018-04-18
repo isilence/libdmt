@@ -14,6 +14,7 @@ struct dlm_mem_cl {
 	struct dlm_mem mem;
 	struct dlm_mem *master;
 
+	cl_platform_id		platform;
 	cl_device_id		dev;
 	cl_context		context;
 	cl_command_queue	queue;
@@ -27,6 +28,7 @@ struct dlm_mem_cl {
 	dlm_mem_to_dlm((memobj), struct dlm_mem_cl, DLM_MAGIC_MEM_OPENCL)
 
 struct dlm_mem_cl_context {
+	cl_platform_id		platform;
 	cl_device_id		device;
 	cl_context		context;
 	cl_command_queue	queue;
@@ -45,5 +47,10 @@ struct dlm_mem_cl *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
 
 void *dlm_mem_cl_map(struct dlm_mem_cl *mem, int flags);
 int dlm_mem_cl_unmap(struct dlm_mem_cl *mem, void *ptr);
+
+static inline bool is_cl_mem(struct dlm_mem *mem)
+{
+	return dlm_mem_get_magic(mem) == DLM_MAGIC_MEM_OPENCL;
+}
 
 #endif /* DLM_OPENCL_MEMORY_H__ */

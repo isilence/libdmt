@@ -9,12 +9,14 @@ void dlm_mem_init(struct dlm_mem *mem,
 		  size_t size,
 		  magic_t magic)
 {
+	memset((void *)mem, 0, sizeof(*mem));
 	dlm_obj_init(&mem->obj, &root);
 
 	mem->obj.magic = magic;
 	mem->size = size;
 	mem->ops = NULL;
-	mem->err;
+	mem->err = 0;
+	mem->fd = -1;
 }
 
 int dlm_mem_eventfd_lock(struct dlm_mem *mem)
@@ -36,8 +38,10 @@ int dlm_mem_eventfd_lock_pair(struct dlm_mem *mem1,
 	int rc2 = dlm_mem_eventfd_lock(mem2);
 
 	if (rc1 || rc2) {
-		dlm_mem_eventfd_unlock(mem1);
-		dlm_mem_eventfd_unlock(mem2);
+		if (rc1)
+			dlm_mem_eventfd_unlock(mem1);
+		if (rc2)
+			dlm_mem_eventfd_unlock(mem2);
 
 		return -EFAULT;
 	}
@@ -58,12 +62,13 @@ int dlm_mem_eventfd_unlock(struct dlm_mem *mem)
 
 int dlm_mem_copy_back(struct dlm_mem * restrict src,
 		      struct dlm_mem * restrict dst,
+		      size_t size,
 		      enum DLM_COPY_DIR dir)
 {
 	if (dir != DLM_COPY_FORWARD)
 		return -ENOSYS;
 
-	return dst->ops->copy(dst, src, DLM_COPY_BACKWARD);
+	return dst->ops->copy(dst, src, size, DLM_COPY_BACKWARD);
 }
 
 struct dlm_mem** dlm_mem_create_pair(struct dlm_mem *m1,
@@ -84,8 +89,11 @@ struct dlm_mem** dlm_mem_create_pair_locked(struct dlm_mem *m1,
 	int ret;
 	struct dlm_mem **pair = dlm_mem_create_pair(m1, m2);
 
+	if (!pair)
+		return NULL;
+
 	ret = dlm_mem_eventfd_lock_pair(m1, m2);
-	if (!ret) {
+	if (ret) {
 		free(pair);
 		return NULL;
 	}

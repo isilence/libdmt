@@ -88,7 +88,7 @@ static void cl_release(struct dlm_obj *dlm_obj)
 }
 
 static const struct dlm_mem_ops opencl_memory_ops = {
-	.copy = dlm_mem_cl_copy
+	.copy = dlm_mem_cl_copy,
 };
 
 static const struct dlm_obj_ops cl_obj_ops = {
@@ -132,6 +132,9 @@ static cl_int init_mem_from_ctx(struct dlm_mem_cl *mem,
 		return ret;
 	mem->dev = ctx->device;
 
+	mem->platform = ctx->platform;
+	mem->clmem = NULL;
+
 	return CL_SUCCESS;
 }
 
@@ -140,9 +143,8 @@ static int init_cl_mem(struct dlm_mem_cl *mem,
 {
 	cl_int ret;
 
-	memset((void *)mem, 0, sizeof(*mem));
-	mem->mem.fd = -1;
-	mem->busy = false;
+	dlm_mem_init(&mem->mem, 0, DLM_MAGIC_MEM_OPENCL);
+	mem->master = NULL;
 
 	ret = init_mem_from_ctx(mem, ctx);
 	if (ret != CL_SUCCESS)
@@ -152,22 +154,28 @@ static int init_cl_mem(struct dlm_mem_cl *mem,
 	if (mem->mem.fd < 0)
 		return errno;
 
-	dlm_mem_init(&mem->mem, 0, DLM_MAGIC_MEM_OPENCL);
 	dlm_obj_set_ops(&mem->mem.obj, &cl_obj_ops);
 	mem->mem.ops = &opencl_memory_ops;
+	mem->busy = false;
+	mem->err = CL_SUCCESS;
 
-	return CL_SUCCESS;
+	return 0;
 }
 
 static struct dlm_mem_cl *allocate_cl_mem(const struct dlm_mem_cl_context *ctx)
 {
 	struct dlm_mem_cl *mem;
+	int ret;
 
 	mem = (struct dlm_mem_cl *)malloc(sizeof(*mem));
 	if (!mem)
 		return NULL;
 
-	init_cl_mem(mem, ctx);
+	ret = init_cl_mem(mem, ctx);
+	if (ret) {
+		free(mem);
+		mem = NULL;
+	}
 	return mem;
 }
 
@@ -307,7 +315,7 @@ struct dlm_mem_cl *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
 	err = dlm_cl_create_memory(mem, ctx, master->size, flags);
 clean:
 	if (err) {
-		cl_destroy_cl_mem(mem);
+		(void)cl_destroy_cl_mem(mem);
 		return NULL;
 	}
 	return mem;

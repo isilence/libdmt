@@ -23,6 +23,7 @@ int dlm_mem_eventfd_lock_pair(struct dlm_mem *mem1,
 
 int dlm_mem_copy_back(struct dlm_mem * restrict src,
 		      struct dlm_mem * restrict dst,
+		      size_t size,
 		      enum DLM_COPY_DIR forward);
 
 struct dlm_mem** dlm_mem_create_pair(struct dlm_mem *m1,

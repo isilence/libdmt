@@ -8,8 +8,6 @@
 #include <stddef.h>
 #include <stdatomic.h>
 
-typedef unsigned int u32;
-
 #define DLM_MAGIC_ROOT \
 	DLM_MAGIC_CREATE(DLM_MAGIC_BASE_CREATE(0x9007), 0)
 

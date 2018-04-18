@@ -9,6 +9,15 @@
 
 #define dlm_obj_to_vms(dlm_obj) dlm_mem_to_vms(dlm_obj_to_mem((dlm_obj)))
 
+static void vms_mem_release(struct dlm_mem_vms *mem)
+{
+	if (mem->mem.fd >= 0)
+		close(mem->mem.fd);
+	if (mem->va)
+		free(mem->va);
+	free(mem);
+}
+
 static void vms_release(struct dlm_obj *dlm_obj)
 {
 	struct dlm_mem_vms *mem;
@@ -16,16 +25,12 @@ static void vms_release(struct dlm_obj *dlm_obj)
 	if (dlm_obj->magic != DLM_MAGIC_MEM_VMS)
 		return;
 	mem = dlm_obj_to_vms(dlm_obj);
-
-	if (mem->mem.fd >= 0)
-		close(mem->mem.fd);
-	mem->mem.fd = -1;
-	free(mem->va);
-	free(mem);
+	vms_mem_release(mem);
 }
 
 static int vms_copy(struct dlm_mem * restrict src,
 		    struct dlm_mem * restrict dst,
+		    size_t size,
 		    enum DLM_COPY_DIR dir)
 {
 	struct dlm_mem_vms *vms_src;
@@ -35,15 +40,24 @@ static int vms_copy(struct dlm_mem * restrict src,
 
 	if (is_mem_vms(dst)) {
 		struct dlm_mem_vms *vms_dst;
+		void *srcva, *dstva;
 
 		vms_src = dlm_mem_to_vms(src);
 		vms_dst = dlm_mem_to_vms(dst);
 
-		memcpy(vms_dst->va, vms_src->va, vms_src->mem.size);
+		if (dir == DLM_COPY_FORWARD) {
+			srcva = vms_src->va;
+			dstva = vms_dst->va;
+		} else {
+			dstva = vms_dst->va;
+			srcva = vms_src->va;
+		}
+
+		memcpy(dstva, srcva, size);
 		return 0;
 	}
 
-	return dlm_mem_copy_back(src, dst, dir);
+	return -ENOSYS;
 }
 
 static const struct dlm_obj_ops vms_obj_ops = {
@@ -63,18 +77,26 @@ struct dlm_mem_vms *dlm_vms_allocate_memory(size_t size)
 	if (!mem)
 		return NULL;
 
+	dlm_mem_init(&mem->mem, size, DLM_MAGIC_MEM_VMS);
+	mem->va = 0;
+
 	fd = eventfd(666, EFD_CLOEXEC);
 	if (fd < 0)
-		return NULL;
+		goto error;
 
-	dlm_mem_init(&mem->mem, size, DLM_MAGIC_MEM_VMS);
 	dlm_obj_set_ops(&mem->mem.obj, &vms_obj_ops);
 	mem->mem.ops = &vms_memory_ops;
-	mem->va = valloc(size);
 	mem->mem.fd = fd;
-	dlm_mem_retain(&mem->mem);
+	mem->va = valloc(size);
 
+	if (!mem->va)
+		goto error;
+
+	dlm_mem_retain(&mem->mem);
 	return mem;
+error:
+	vms_mem_release(mem);
+	return NULL;
 }
 
 struct dlm_mem_vms *dlm_vms_create_from(struct dlm_mem *master)
