@@ -44,7 +44,7 @@ static int cl_try_copy_cl2cl(struct dlm_mem_cl *restrict src,
 	struct dlm_mem_cl *dst;
 	struct dlm_mem **pair = NULL;
 
-	if (!is_cl_mem(dlm_dst))
+	if (!is_mem_cl(dlm_dst))
 		return -ENOSYS;
 
 	dst = dlm_mem_to_cl(dlm_dst);
@@ -122,7 +122,7 @@ int dlm_mem_cl_copy(struct dlm_mem * restrict src,
 	struct dlm_mem_cl *mem;
 	int ret;
 
-	if (!is_cl_mem(src))
+	if (!is_mem_cl(src))
 		return -EINVAL;
 	mem = dlm_mem_to_cl(src);
 

@@ -22,6 +22,8 @@ struct dlm_mem_cl {
 
 	cl_int			err;
 	bool			busy;
+
+	void			*export;
 };
 
 #define dlm_mem_to_cl(memobj) \
@@ -34,23 +36,25 @@ struct dlm_mem_cl_context {
 	cl_command_queue	queue;
 };
 
-struct dlm_mem_cl *dlm_cl_allocate_memory(const struct dlm_mem_cl_context *ctx,
-					  size_t size,
-					  cl_mem_flags flags);
+struct dlm_mem_cl *dlm_mem_cl_alloc(const struct dlm_mem_cl_context *ctx,
+				    size_t size,
+				    cl_mem_flags flags);
 
 struct dlm_mem_cl *
-dlm_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx, cl_mem clmem);
+dlm_mem_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx, cl_mem clmem);
 
-struct dlm_mem_cl *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
-				      struct dlm_mem *master,
-				      cl_mem_flags flags);
+struct dlm_mem_cl *dlm_mem_cl_create_from(const struct dlm_mem_cl_context *ctx,
+					  struct dlm_mem *master,
+					  cl_mem_flags flags);
 
 void *dlm_mem_cl_map(struct dlm_mem_cl *mem, int flags);
 int dlm_mem_cl_unmap(struct dlm_mem_cl *mem, void *ptr);
 
-static inline bool is_cl_mem(struct dlm_mem *mem)
+static inline bool is_mem_cl(struct dlm_mem *mem)
 {
 	return dlm_mem_get_magic(mem) == DLM_MAGIC_MEM_OPENCL;
 }
+
+int dlm_mem_cl_export_dma_buf(struct dlm_mem_cl *mem);
 
 #endif /* DLM_OPENCL_MEMORY_H__ */

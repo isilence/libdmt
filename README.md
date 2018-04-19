@@ -15,7 +15,8 @@ with a common abstract interface.
 ### Prerequisites
 * gcc
 * OpenCL 1.2+ SDK
-* rdma-core
+* soft-roce [custom kernel](https://github.com/ISilence/linux/tree/ib3)
+* rdma-core [custom](https://github.com/ISilence/rdma-core/tree/dma-buf)
 * CMake 2.6
 * cmocka
 

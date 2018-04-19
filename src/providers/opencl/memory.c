@@ -9,6 +9,8 @@
 #include "dlm_opencl.h"
 #include "generic.h"
 
+typedef cl_int (*cl_export_dma_buf_t)(cl_context, cl_mem, int *);
+
 int dlm_rc_cl2unix(cl_int err)
 {
 	int ret;
@@ -33,6 +35,25 @@ int dlm_rc_cl2unix(cl_int err)
 
 	return ret;
 }
+
+
+int dlm_mem_cl_export_dma_buf(struct dlm_mem_cl *mem)
+{
+	cl_export_dma_buf_t export_dma_buf;
+	cl_int ret;
+	int fd;
+
+	if (!mem->export)
+		return -EFAULT;
+	export_dma_buf = (cl_export_dma_buf_t)mem->export;
+
+	ret = export_dma_buf(mem->context, mem->clmem, &fd);
+	if (!ret)
+		return ret;
+
+	return fd;
+}
+
 
 static int cl_release_cl_mem(struct dlm_mem_cl *mem)
 {
@@ -112,6 +133,21 @@ static const struct dlm_obj_ops cl_obj_ops = {
  * 	function where \init_cl_mem/\allocate_cl_mem have been called
  */
 
+static void init_extensions(struct dlm_mem_cl *mem)
+{
+	cl_export_dma_buf_t exp = NULL;
+
+#ifdef CL_VERSION_1_2
+	exp = (cl_export_dma_buf_t)clGetExtensionFunctionAddressForPlatform(
+		mem->platform, "clGetMemObjectFdIntel");
+#else
+	exp = (cl_export_dma_buf_t)clGetExtensionFunctionAddress(
+				"clGetMemObjectFdIntel");
+#endif
+
+	mem->export = (void *)exp;
+}
+
 static cl_int init_mem_from_ctx(struct dlm_mem_cl *mem,
 				const struct dlm_mem_cl_context *ctx)
 {
@@ -135,6 +171,8 @@ static cl_int init_mem_from_ctx(struct dlm_mem_cl *mem,
 	mem->platform = ctx->platform;
 	mem->clmem = NULL;
 
+	init_extensions(mem);
+
 	return CL_SUCCESS;
 }
 
@@ -145,6 +183,7 @@ static int init_cl_mem(struct dlm_mem_cl *mem,
 
 	dlm_mem_init(&mem->mem, 0, DLM_MAGIC_MEM_OPENCL);
 	mem->master = NULL;
+	mem->export = NULL;
 
 	ret = init_mem_from_ctx(mem, ctx);
 	if (ret != CL_SUCCESS)
@@ -226,9 +265,9 @@ dlm_cl_create_memory(struct dlm_mem_cl *mem,
 }
 
 struct dlm_mem_cl *
-dlm_cl_allocate_memory(const struct dlm_mem_cl_context *ctx,
-		       size_t size,
-		       cl_mem_flags flags)
+dlm_mem_cl_alloc(const struct dlm_mem_cl_context *ctx,
+		 size_t size,
+		 cl_mem_flags flags)
 {
 	int err;
 	struct dlm_mem_cl *mem;
@@ -245,8 +284,8 @@ dlm_cl_allocate_memory(const struct dlm_mem_cl_context *ctx,
 }
 
 struct dlm_mem_cl *
-dlm_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx,
-			 cl_mem clmem)
+dlm_mem_cl_create_from_clmem(const struct dlm_mem_cl_context *ctx,
+			     cl_mem clmem)
 {
 	struct dlm_mem_cl *mem = NULL;
 	cl_int ret;
@@ -293,9 +332,9 @@ static int create_from_vms(struct dlm_mem_cl *mem,
 	return err;
 }
 
-struct dlm_mem_cl *dlm_cl_create_from(const struct dlm_mem_cl_context *ctx,
-				      struct dlm_mem *master,
-				      cl_mem_flags flags)
+struct dlm_mem_cl *dlm_mem_cl_create_from(const struct dlm_mem_cl_context *ctx,
+					  struct dlm_mem *master,
+					  cl_mem_flags flags)
 {
 	struct dlm_mem_cl *mem;
 	int err = 0;
